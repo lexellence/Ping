@@ -31,11 +31,11 @@ namespace d2d
 		m_upperBound = center + halfDimensions;
 		SortBounds();
 	}
-	const b2Vec2& Rect::GetCenter() const
+	b2Vec2 Rect::GetCenter() const
 	{
 		return 0.5f * (m_lowerBound + m_upperBound);
 	}
-	const b2Vec2& Rect::GetDimensions() const
+	b2Vec2 Rect::GetDimensions() const
 	{
 		return (m_upperBound - m_lowerBound);
 	}

@@ -7,9 +7,7 @@
 ** Header file for the ResourceManager templated class
 **
 \**************************************************************************************/
-#ifndef RESOURCEMANAGER_H
-#define RESOURCEMANAGER_H
-
+#pragma once
 namespace d2d
 {
 	template<class ResourceType>
@@ -108,4 +106,3 @@ namespace d2d
 		std::map<std::string, unsigned int> m_filenameIndexMap;
 	};
 }
-#endif //RESOURCEMANAGER_H

@@ -7,8 +7,7 @@
 ** Header file for the Renderer namespace
 **
 \**************************************************************************************/
-#ifndef RENDERER_H
-#define RENDERER_H
+#pragma once
 #include "Rect.h"
 #include "Color.h"
 #include "Utility.h"
@@ -166,7 +165,7 @@ namespace d2d
 		///---------------------\-------------------------------------------------------------- 
 		//| Name: PresentScene	| Call once per frame after drawing
 		//\---------------------/
-		// PostCondition: Video buffers are swapped and the drawing buffer is cleared and ready
+		// PostCondition: Video buffers are swapped and the drawing buffer is cleared and isReady
 		//			for drawing of the next frame.
 		//-------------------------------------------------------------------------------------
 		void PresentScene();
@@ -181,6 +180,5 @@ namespace d2d
 		bool UnloadFont(unsigned int fontID);
 		bool UnloadTextureList(std::vector<unsigned int>& m_textureIDList);
 		bool UnloadFontList(std::vector<unsigned int>& m_fontIDList);
-	} //Renderer
-} //d2d
-#endif //RENDERER_H
+	}
+}

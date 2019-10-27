@@ -4,7 +4,7 @@
 ** Author: David Leksen
 ** Date:
 **
-** Header file for the precompiled header
+** Precompiled header file
 **
 \**************************************************************************************/
 // D2_ASSERT_LEVEL:
@@ -16,9 +16,6 @@
 
 #include <Box2D/Box2D.h>
 #include <SDL.h>
-
-// uncomment to disable assert():
-// #define NDEBUG
 
 #include <cassert>
 #include <memory>

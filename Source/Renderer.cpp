@@ -913,7 +913,7 @@ namespace d2d
 		///---------------------\-------------------------------------------------------------- 
 		//| Name: PresentScene	| Call once per frame after drawing
 		//\---------------------/
-		// PostCondition: Updates the screen and gets ready for drawing the next frame.
+		// PostCondition: Updates the screen and gets isReady for drawing the next frame.
 		//-------------------------------------------------------------------------------------
 		void PresentScene()
 		{

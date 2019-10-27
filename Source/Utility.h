@@ -7,9 +7,7 @@
 ** Header file for miscellaneous useful things
 **
 \**************************************************************************************/
-#ifndef UTILITY_H
-#define UTILITY_H
-
+#pragma once
 namespace d2d
 {
 	template <typename T>
@@ -32,4 +30,3 @@ namespace d2d
 	void ConstrainRadians(float& theta);
 	void ConstrainDegrees(float& angle);
 }
-#endif //UTILITY_H

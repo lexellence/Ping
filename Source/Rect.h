@@ -4,12 +4,10 @@
 ** Author: David Leksen
 ** Date: 
 **
-** Header file for the Rectangle class
+** Header file for the Rect class
 **
 \**************************************************************************************/
-#ifndef RECT_H
-#define RECT_H
-
+#pragma once
 namespace d2d
 {
 	class Rect
@@ -19,8 +17,8 @@ namespace d2d
 		Rect(const b2Vec2& newLowerBound, const b2Vec2& newUpperBound);
 		void SetBounds(const b2Vec2& newLowerBound, const b2Vec2& newUpperBound);
 		void SetCenter(const b2Vec2& center, const b2Vec2& dimensions);
-		const b2Vec2& GetCenter() const;
-		const b2Vec2& GetDimensions() const;
+		b2Vec2 GetCenter() const;
+		b2Vec2 GetDimensions() const;
 		float GetWidth() const;
 		float GetHeight() const;
 		const b2Vec2& GetLowerBound() const;
@@ -37,5 +35,3 @@ namespace d2d
 		void SortBounds();
 	};
 }
-
-#endif //RECT_H

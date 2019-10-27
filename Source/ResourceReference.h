@@ -7,9 +7,7 @@
 ** Header file for the ResourceReference, TextureResource, FontResource classes
 **
 \**************************************************************************************/
-#ifndef RESOURCEREFERENCE_H
-#define RESOURCEREFERENCE_H
-
+#pragma once
 namespace d2d
 {
 	// Automatically load/unload resource to/from current Renderer on ctor/dtor
@@ -42,4 +40,3 @@ namespace d2d
 		virtual ~FontReference();
 	};
 }
-#endif //RESOURCEREFERENCE_H

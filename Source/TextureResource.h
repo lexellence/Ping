@@ -7,8 +7,7 @@
 ** Header file for the TextureResource class
 **
 \**************************************************************************************/
-#ifndef TEXTURERESOURCE_H
-#define TEXTURERESOURCE_H
+#pragma once
 #include "Resource.h"
 #include <SDL_opengl.h>
 
@@ -25,4 +24,3 @@ namespace d2d
 		GLuint m_glTextureID{ 0 };
 	};
 }
-#endif //TEXTURERESOURCE_H

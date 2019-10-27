@@ -7,8 +7,7 @@
 ** Header file for the Resource class
 **
 \**************************************************************************************/
-#ifndef RESOURCE_H
-#define RESOURCE_H
+#pragma once
 namespace d2d
 {
 	class Resource
@@ -28,4 +27,3 @@ namespace d2d
 		void SetLoadSuccess(bool loadSuccess);
 	};
 }
-#endif //RESOURCE_H

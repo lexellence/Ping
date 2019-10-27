@@ -7,9 +7,7 @@
 ** Header file for the Application class
 **
 \**************************************************************************************/
-#ifndef APPLICATION_H
-#define APPLICATION_H
-
+#pragma once
 namespace d2d
 {
 	class Application
@@ -23,4 +21,3 @@ namespace d2d
 		virtual void Shutdown()=0;
 	};
 }
-#endif //APPLICATION_H

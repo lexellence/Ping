@@ -7,9 +7,7 @@
 ** Header file for the Color class
 **
 \**************************************************************************************/
-#ifndef COLOR_H
-#define COLOR_H
-
+#pragma once
 namespace d2d
 {
 	// Color channel range: [0.0, 1.0]
@@ -26,7 +24,5 @@ namespace d2d
 
 		const static float COLOR_MIN;
 		const static float COLOR_MAX;
-
 	};
 }
-#endif //COLOR_H

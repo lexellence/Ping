@@ -7,8 +7,7 @@
 ** Header file for the Timer class
 **
 \**************************************************************************************/
-#ifndef TIMER_H
-#define TIMER_H
+#pragma once
 namespace d2d
 {
 	///-------------------------------------\---------------------------------------------- 
@@ -44,6 +43,5 @@ namespace d2d
 		Uint64 m_lastTicks;
 	};
 }
-#endif //TIMER_H
 
 

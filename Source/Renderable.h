@@ -7,8 +7,7 @@
 ** Header file for the Renderable interface
 **
 \**************************************************************************************/
-#ifndef RENDERABLE_H
-#define RENDERABLE_H
+#pragma once
 #include "Color.h"
 #include "Renderer.h"
 
@@ -50,4 +49,3 @@ namespace d2d
 				  const Color& newColor);
 	};
 } // namespace Renderable
-#endif //RENDERABLE_H

@@ -7,8 +7,7 @@
 ** Header file for the FontResource class
 **
 \**************************************************************************************/
-#ifndef FONTRESOURCE_H
-#define FONTRESOURCE_H
+#pragma once
 #include "Resource.h"
 #include "drawtext.h"
 
@@ -27,4 +26,3 @@ namespace d2d
 		static const int m_dtxFontSize{ 192 };
 	};
 }
-#endif //FONTRESOURCE_H
