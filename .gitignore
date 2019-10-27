@@ -1,0 +1,6 @@
+source/trash/
+*.bsc
+*.obj
+*.pdb
+*.iobj
+*.ipdb
