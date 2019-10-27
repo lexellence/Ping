@@ -21,7 +21,7 @@ namespace Pong
 		/*void AddController(int deviceIndex);
 		void RemoveController(int joystickID);*/
 
-		std::string m_logFilename{ "PongLog.txt" };
+		std::string m_logFilename{ "Pong.log" };
 
 		d2d::Timer m_timer;
 		std::shared_ptr<d2d::GameState> m_currentStatePtr;

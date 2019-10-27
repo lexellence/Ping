@@ -4,3 +4,4 @@ source/trash/
 *.pdb
 *.iobj
 *.ipdb
+*.log
