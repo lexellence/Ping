@@ -1,0 +1,12 @@
+{
+    client:
+    {
+        remoteIP: "127.0.0.1"
+        remotePort: 8909
+        localPort: 8910
+    }
+    server:
+    {
+        localPort: 8909
+    }
+}

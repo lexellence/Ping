@@ -1,0 +1,24 @@
+{
+  gamepads: {
+    controllerDBFilePath: "Controllers\\gamecontrollerdb.txt"
+    deadZoneStick: 6700
+    deadZoneTrigger: 1000
+    aliveZoneStick: 2000
+    aliveZoneTrigger: 2000
+  }
+  window: {
+    title: "Pong"
+    fullScreen: false
+    position: [ 100, 50 ]
+    size: [ 800, 500 ]
+    vsync: true
+    doubleBuffer: true
+    antiAliasingSamples: 4  // 1 disables AA, 2-16 enables AA
+    colorChannelBits: [ 8, 8, 8, 8 ]
+    fpsUpdatesPerSecond: 2
+    imageExtensions: [ "webp" ]
+    glVersion: [ 2, 1 ]
+    pointSmoothing: true
+    lineSmoothing: false
+  }
+}
