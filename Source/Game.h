@@ -23,9 +23,9 @@ namespace Pong
 
 	const unsigned SCORE_TO_WIN{ 3u };
 	const float INITIAL_COUNTDOWN{ 3.0f };
-	const float INITIAL_PUCK_SPEED{ 0.575f * GAME_RECT.GetWidth() };
-	const float INITIAL_PUCK_ANGLE{ 0.748f * d2d::PI };
-	const float BOUNCE_ANGLE_RANGE{ 0.780f * d2d::PI };
+	const float INITIAL_PUCK_SPEED{ 0.4f * GAME_RECT.GetWidth() };
+	//const float INITIAL_PUCK_ANGLE{ 0.748f * d2d::PI };
+	const float BOUNCE_ANGLE_RANGE{ 0.650f * d2d::PI };
 	const float PUCK_SPEED_BOOST_MULTIPLIER{ 1.07f };
 	const float PLAYER_MAX_SPEED{ 0.8f * INITIAL_PUCK_SPEED };
 
@@ -40,7 +40,7 @@ namespace Pong
 	const Byte MESSAGE_PLAYER_READY = 100;
 	const Byte MESSAGE_PLAYER_SCORED = 101;
 	const Byte MESSAGE_COUNTDOWN_LEFT = 102;
-	const Byte MESSAGE_PUCK_POSITION = 103;
+	const Byte MESSAGE_PUCK_POSITION_VELOCITY = 103;
 	const Byte MESSAGE_PLAYER_POSITION = 104;
 	const Byte MESSAGE_PLAYER_QUIT = 105;
 
@@ -147,7 +147,9 @@ namespace Pong
 		bool Scored() const;
 		void Update(float dt, Player& player1, Player& player2);
 		const b2Vec2& GetPosition() const;
+		const b2Vec2& GetVelocity() const;
 		void SetPosition(const b2Vec2& position);
+		void SetVelocity(const b2Vec2& velocity);
 		void Draw() const;
 
 	private:
@@ -189,9 +191,6 @@ namespace Pong
 		void DrawScore(const Player& player) const;
 		void DrawWaitingMessage(const Player& player) const;
 
-		bool IsClient() const;
-		bool IsServer() const;
-		bool IsNetworked() const;
 		void InitNetwork();
 		void CloseNetwork();
 		void SendNetworkData();

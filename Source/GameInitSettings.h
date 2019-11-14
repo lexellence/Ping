@@ -20,5 +20,8 @@ namespace Pong
 		};
 		void SetGameMode(Mode mode);
 		Mode GetGameMode();
+		bool IsClient();
+		bool IsServer();
+		bool IsNetworked();
 	}
 }

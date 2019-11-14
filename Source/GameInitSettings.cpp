@@ -26,5 +26,18 @@ namespace Pong
 		{
 			return m_mode;
 		}
+		bool IsClient()
+		{
+			return (m_mode == GameInitSettings::Mode::CLIENT);
+		}
+		bool IsServer()
+		{
+			return (m_mode == GameInitSettings::Mode::SERVER);
+		}
+		bool IsNetworked()
+		{
+			return (m_mode == GameInitSettings::Mode::CLIENT ||
+				m_mode == GameInitSettings::Mode::SERVER);
+		}
 	}
 }

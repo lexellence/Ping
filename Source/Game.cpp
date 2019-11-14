@@ -13,6 +13,8 @@
 #include "NetworkDef.h"
 #include "Exceptions.h"
 
+using namespace Pong::GameInitSettings;
+
 namespace Pong
 {
 	//+--------------------------------\--------------------------------------
@@ -166,19 +168,6 @@ namespace Pong
 
 		// Clear the message queue
 		m_networkInputBuffer.length = 0;
-	}
-	bool Game::IsClient() const
-	{
-		return (m_mode == GameInitSettings::Mode::CLIENT);
-	}
-	bool Game::IsServer() const
-	{
-		return (m_mode == GameInitSettings::Mode::SERVER);
-	}
-	bool Game::IsNetworked() const
-	{
-		return (m_mode == GameInitSettings::Mode::CLIENT || 
-			m_mode == GameInitSettings::Mode::SERVER);
 	}
 
 	void Game::Player1PressedAButton()
@@ -386,10 +375,6 @@ namespace Pong
 
 	void Game::Update(float dt)
 	{
-		// Process network input
-		if (IsNetworked() && m_state != GameState::WAIT_FOR_CLIENT_CONNECTION)
-			CheckMessages();
-
 		// Update
 		switch (m_state)
 		{
@@ -410,6 +395,10 @@ namespace Pong
 		default:
 			break;
 		}
+
+		// Process network input
+		if (IsNetworked() && m_state != GameState::WAIT_FOR_CLIENT_CONNECTION)
+			CheckMessages();
 
 		// Process network output
 		if (IsNetworked() && m_state != GameState::WAIT_FOR_CLIENT_CONNECTION)
@@ -561,7 +550,7 @@ namespace Pong
 			}
 
 			// Puck position/velocity
-		case MESSAGE_PUCK_POSITION:
+		case MESSAGE_PUCK_POSITION_VELOCITY:
 			if (IsServer())
 				throw GameException{ "Client should not send PUCK_POSITION message" };
 			else
@@ -572,11 +561,17 @@ namespace Pong
 				if (availableDataBytes < messageBytes)
 					return first;
 
-				// Read message
-				b2Vec2 newPosition;
-				newPosition.x = data.ReadFloat(first + 1);
-				newPosition.y = data.ReadFloat(first + 1 + sizeof(float));
-				m_puck.SetPosition(newPosition);
+				// Read position
+				b2Vec2 inputVector;
+				inputVector.x = data.ReadFloat(first + 1);
+				inputVector.y = data.ReadFloat(first + 1 + sizeof(float));
+				m_puck.SetPosition(inputVector);
+
+				// Read velocity
+				inputVector.x = data.ReadFloat(first + 1 + 2 * sizeof(float));
+				inputVector.y = data.ReadFloat(first + 1 + 3 * sizeof(float));
+				m_puck.SetVelocity(inputVector);
+
 				return first + messageBytes;
 			}
 
@@ -683,7 +678,7 @@ namespace Pong
 		if (!IsServer())
 			m_player2.Update(dt);
 
-		if (!IsClient())
+		//if (!IsClient())
 			m_puck.Update(dt, m_player1, m_player2);
 
 		if (IsClient())
@@ -693,9 +688,11 @@ namespace Pong
 		}
 		else if (IsServer())
 		{
-			m_networkOutputBuffer.WriteByte(MESSAGE_PUCK_POSITION);
+			m_networkOutputBuffer.WriteByte(MESSAGE_PUCK_POSITION_VELOCITY);
 			m_networkOutputBuffer.WriteFloat(m_puck.GetPosition().x);
 			m_networkOutputBuffer.WriteFloat(m_puck.GetPosition().y);
+			m_networkOutputBuffer.WriteFloat(m_puck.GetVelocity().x);
+			m_networkOutputBuffer.WriteFloat(m_puck.GetVelocity().y);
 
 			m_networkOutputBuffer.WriteByte(MESSAGE_PLAYER_POSITION);
 			m_networkOutputBuffer.WriteFloat(m_player1.GetPosition().y);
@@ -802,9 +799,20 @@ namespace Pong
 	{
 		m_position = GAME_RECT.GetCenter() - 0.5f * PUCK_SIZE;
 
-		// TODO: Randomize puck angle
-		m_velocity.Set(cos(INITIAL_PUCK_ANGLE), sin(INITIAL_PUCK_ANGLE));
-		m_velocity *= INITIAL_PUCK_SPEED;
+		if (IsClient())
+			m_velocity = b2Vec2_zero;
+		else
+		{
+			// Randomize puck angle
+			d2d::SeedRandomNumberGenerator();
+			float halfAngleRange = BOUNCE_ANGLE_RANGE * 0.5f;
+			float angle = d2d::RandomFloat({ -halfAngleRange, halfAngleRange });
+			if (d2d::RandomBool())
+				angle += d2d::PI;
+
+			m_velocity.Set(cos(angle), sin(angle));
+			m_velocity *= INITIAL_PUCK_SPEED;
+		}
 
 		m_gotPastPlayer = false;
 		m_scored = false;
@@ -816,13 +824,16 @@ namespace Pong
 	void Puck::Update(float dt, Player& player1, Player& player2)
 	{
 		UpdatePosition(dt);
-		if (!m_gotPastPlayer)
+		if (!IsClient())
 		{
-			HandlePlayerCollision(player1);
-			HandlePlayerCollision(player2);
+			if (!m_gotPastPlayer)
+			{
+				HandlePlayerCollision(player1);
+				HandlePlayerCollision(player2);
+			}
+			HandleGoal(player1);
+			HandleGoal(player2);
 		}
-		HandleGoal(player1);
-		HandleGoal(player2);
 	}
 	void Puck::UpdatePosition(float dt)
 	{
@@ -851,12 +862,17 @@ namespace Pong
 	{
 		return m_position;
 	}
+	const b2Vec2& Puck::GetVelocity() const
+	{
+		return m_velocity;
+	}
 	void Puck::SetPosition(const b2Vec2& position)
 	{
-		//if(!GAME_RECT.Contains(position, true) || !GAME_RECT.Contains(position + PUCK_SIZE, true))
-		//	throw GameException{ std::string{"Puck::SetPosition: Out of bounds: x="} + 
-		//		d2d::ToString(position.x) + " y=" + d2d::ToString(position.y) };
 		m_position = position;
+	}
+	void Puck::SetVelocity(const b2Vec2& velocity)
+	{
+		m_velocity = velocity;
 	}
 	void Puck::HandlePlayerCollision(const Player& player)
 	{
