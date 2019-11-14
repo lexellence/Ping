@@ -1,6 +1,6 @@
 /**************************************************************************************\
 ** File: App.cpp
-** Project: Pong
+** Project:
 ** Author: David Leksen
 ** Date:
 **
@@ -9,134 +9,159 @@
 \**************************************************************************************/
 #include "pch.h"
 #include "App.h"
+#include "AppState.h"
+#include "AppDef.h"
 #include "Intro.h"
-#include "d2d.h"
+#include "MainMenu.h"
+#include "Gameplay.h"
+#include "Exceptions.h"
 
 namespace Pong
 {
-	bool App::Init()
+	void App::Run()
 	{
-		// Redirect cerr/stderr output to file for logging
-		FILE *file;
-		file = new FILE;
-		if (freopen_s(&file, m_logFilename.c_str(), "w", stderr))
-			std::cerr << "Warning: Failed to redirect stderr to" << m_logFilename << std::endl;
+		Init();
 
-		// Init all SDL subsystems
-		if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+		d2d::Timer timer;
+		timer.Start();
+		while(m_nextState != AppStateID::QUIT)
 		{
-			std::cerr << "Error: Failed to initialize SDL " << SDL_GetError() << std::endl;
-			SDL_ClearError();
-			return false;
+			timer.Update();
+			Step(timer.Getdt());
 		}
-
-		// Create window
-		d2d::ScreenDef settings;
-		if (!d2d::Renderer::CreateScreen(settings))
+		Shutdown();
+	}
+	void App::Init()
+	{
+		// Init d2d
+		d2d::Init(d2LogSeverityTrace, "PongLog.txt");
 		{
-			std::cerr << "Error: Unable to initialize screen: " << SDL_GetError() << std::endl;
-			SDL_ClearError();
-			return false;
+			AppDef settings;
+			settings.LoadFrom("Data\\app.hjson");
+
+			d2d::InitGamepads(settings.gamepads);
+			d2d::Window::Init(settings.window);
+			m_hasFocus = false;
 		}
+		d2d::SeedRandomNumberGenerator();
 
-		// Init timer
-		m_timer.Start();
+		// Allocate AppState memory
+		m_introPtr = std::make_shared<Intro>();
+		m_mainMenuPtr = std::make_shared<MainMenu>();
+		m_gameplayPtr = std::make_shared<Gameplay>();
 
-		/*
-		// Init gamepads
-		int numJoysticks = SDL_NumJoysticks();
-		for(int j = 0; j < numJoysticks; ++j)
+		// Start first app state
+		m_currentState = FIRST_APP_STATE;
+		m_nextState = FIRST_APP_STATE;
+		//InitCurrentState();
+		GetStatePtr(m_currentState)->Init();
+	}
+	void App::Step(float dt)
+	{
+		d2d::ClampHigh(dt, MAX_APP_STEP);
+
+		UpdateCurrentState(dt);
+
+		if(m_nextState != AppStateID::QUIT)
 		{
-			AddController(j);
-		}*/
-
-		// Start Intro
-		m_currentStatePtr = std::make_shared<Intro>();
-		return true;
+			if(m_nextState != m_currentState)
+			{
+				m_currentState = m_nextState;
+				//InitCurrentState();	
+				GetStatePtr(m_currentState)->Init();
+			}
+			else
+				//if(m_hasFocus)
+				{
+					//DrawCurrentState();
+					d2d::Window::StartScene();
+					GetStatePtr(m_currentState)->Draw();
+					d2d::Window::EndScene();
+				}
+		}
 	}
-	void App::Shutdown()
+	App::~App()
 	{
-		d2d::Renderer::DestroyScreen();
-		SDL_Quit();
-		fclose(stderr);
+		// Just in case an exception brings us out of the main loop
+		Shutdown();
 	}
-	bool App::Tick()
+	std::shared_ptr<AppState> App::GetStatePtr(AppStateID appState)
 	{
-		// Update timer
-		m_timer.Tick();
+		switch(appState)
+		{
+		case AppStateID::INTRO:		return m_introPtr;
+		case AppStateID::MAIN_MENU: return m_mainMenuPtr;
+		case AppStateID::GAMEPLAY:	return m_gameplayPtr;
+		default: throw InvalidAppStateException{ "GetStatePtr(): No pointer exists for AppState (calling code must ensure argument is not QUIT)" };
+		}
+	}
+	/*void App::InitCurrentState()
+	{
+		try
+		{
+			GetStatePtr(m_currentState)->Init();
+		}
+		catch(const GameException& e)
+		{
+			std::string message{ "AppState init error: " + std::string{ e.what() } };
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", message.c_str(), nullptr);
+			m_currentState = AppStateID::QUIT;
+		}
+	}*/
+	void App::UpdateCurrentState(float dt)
+	{
+		std::shared_ptr<AppState> currentStatePtr{ GetStatePtr(m_currentState) };
 
 		// Handle events
 		SDL_Event event;
-		while(SDL_PollEvent(&event))
+		while(SDL_PollEvent(&event) != 0)
 		{
 			switch(event.type)
 			{
-				case SDL_QUIT:
-					return false;
-				/*case SDL_CONTROLLERDEVICEADDED:
-					AddController(event.cdevice.which);
-					break;
-				case SDL_CONTROLLERDEVICEREMOVED:
-					RemoveController(event.cdevice.which);
-					break;*/
-				default:
-					if(m_currentStatePtr)
-						m_currentStatePtr->ProcessEvent(event);
-			}
-		}
-
-		// Update game state
-		if (m_currentStatePtr)
-			m_currentStatePtr = m_currentStatePtr->Update(m_timer.GetDeltaSeconds());
-
-		// Draw frame
-		if(m_currentStatePtr)
-			m_currentStatePtr->Draw();
-		else
-			return false;
-
-		d2d::Renderer::PresentScene();
-		return true;
-	}
-	/*void App::AddController(int deviceIndex)
-	{
-		// If the joystick is a gamepad
-		if(SDL_IsGameController(deviceIndex))
-		{
-			// Enable the gamepad for use
-			SDL_GameController *controllerPtr = SDL_GameControllerOpen(deviceIndex);
-
-			// If there was an error, bail
-			if(!controllerPtr)
-			{
-				std::cerr << "Could not open gamecontroller " << deviceIndex  
-						  << ": " << SDL_GetError() << std::endl;
+			case SDL_QUIT:
+				m_nextState = AppStateID::QUIT;
 				return;
+			case SDL_WINDOWEVENT:
+				switch(event.window.event)
+				{
+				case SDL_WINDOWEVENT_FOCUS_LOST:
+					m_hasFocus = false;
+					break;
+				case SDL_WINDOWEVENT_FOCUS_GAINED:
+					m_hasFocus = true;
+					break;
+				case SDL_WINDOWEVENT_CLOSE:
+					m_nextState = AppStateID::QUIT;
+					return;
+				}
 			}
-
-			// Get and store joystick ID if there's a slot open.
-			SDL_Joystick *joyPtr = SDL_GameControllerGetJoystick(controllerPtr);
-			int joystickID = SDL_JoystickInstanceID(joyPtr);
-			if(m_controller1JoystickID < 0)
-			{
-				m_controller1JoystickID = joystickID;
-			}
-			else if(m_controller2JoystickID < 0)
-			{
-				m_controller2JoystickID = joystickID;
-			}
+			currentStatePtr->ProcessEvent(event);
 		}
-	}
-	void App::RemoveController(int joystickID)
+
+		//if(m_hasFocus)
+		//{
+			//try
+			//{
+				m_nextState = currentStatePtr->Update(dt);
+			//}
+			//catch(const GameException& e)
+			//{
+			//	std::string message{ "Game update error: " + std::string{ e.what() } };
+			//	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", message.c_str(), nullptr);
+			//	m_nextState = AppStateID::QUIT;
+			//}
+		//}
+	}	
+	/*void App::DrawCurrentState()
 	{
-		if(m_controller1JoystickID == joystickID)
-		{
-			m_controller1JoystickID = -1;
-		}
-		if(m_controller2JoystickID == joystickID)
-		{
-			m_controller2JoystickID = -1;
-		}
-	}*/
-}
+		std::shared_ptr<AppState> currentStatePtr{ GetStatePtr(m_currentState) };
 
+		d2d::Window::StartScene();
+		currentStatePtr->Draw();
+		d2d::Window::EndScene();
+	}*/
+	void App::Shutdown()
+	{
+		d2d::Shutdown();
+	}
+}

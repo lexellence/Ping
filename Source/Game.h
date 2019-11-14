@@ -9,22 +9,12 @@
 \**************************************************************************************/
 #pragma once
 #include "d2d.h"
+#include "NetworkDef.h"
+#include "GameInitSettings.h"
+#include "Exceptions.h"
 
 namespace Pong
 {
-	enum class GameState 
-	{
-		CONFIRM_PLAYERS_READY,
-		COUNTDOWN,
-		PLAY,
-		GAME_OVER
-	};
-	enum class Side
-	{
-		LEFT,
-		RIGHT
-	};
-
 	const d2d::Rect GAME_RECT{ b2Vec2_zero, { 400.0f, 200.0f } };
 	const b2Vec2 PLAYER_SIZE{ 0.02f * GAME_RECT.GetWidth(), 
 							  0.23f * GAME_RECT.GetHeight() };
@@ -44,25 +34,106 @@ namespace Pong
 	const d2d::Color PLAYER_COLOR{ 0.8f, 0.3f, 0.3f };
 	const d2d::Color PUCK_COLOR{ 0.8f, 0.3f, 0.3f };
 
+	const float SLIGHTLY_LESS_THAN_ONE{ 0.99999f };
+
+	using Byte = Uint8;
+	const Byte MESSAGE_PLAYER_READY = 100;
+	const Byte MESSAGE_PLAYER_SCORED = 101;
+	const Byte MESSAGE_COUNTDOWN_LEFT = 102;
+	const Byte MESSAGE_PUCK_POSITION = 103;
+	const Byte MESSAGE_PLAYER_POSITION = 104;
+	const Byte MESSAGE_PLAYER_QUIT = 105;
+
+	const int BUFFER_SIZE{ 256 };
+	using ByteBuffer = Byte[BUFFER_SIZE];
+	struct Buffer
+	{
+		ByteBuffer bytes;
+		int length{ 0 };
+
+		bool IsOverflowing() const
+		{
+			return length > BUFFER_SIZE;
+		}
+		bool IsFull() const
+		{
+			return length >= BUFFER_SIZE;
+		}
+		Byte* FirstBytePtr()
+		{
+			return bytes;
+		}
+		Byte* FirstAvailableBytePtr()
+		{
+			return &(bytes[length]);
+		}
+		int BytesAvailable() const
+		{
+			return BUFFER_SIZE - length;
+		}
+		void WriteByte(Byte value)
+		{
+			if(length + sizeof(Byte) > BUFFER_SIZE)
+				throw GameException{ "Buffer::WriteByte: Overflow: Increase buffer size" };
+			bytes[length] = value;
+			++length;
+		}
+		void WriteFloat(float value)
+		{
+			static_assert(sizeof(Uint32) == sizeof(float));
+			if(length + sizeof(float) > BUFFER_SIZE)
+				throw GameException{ "Buffer::WriteFloat: Overflow: Increase buffer size" };
+			union { float f; Uint32 i; } u;
+			u.f = value;
+			SDLNet_Write32(u.i, &bytes[length]);
+			length += sizeof(Uint32);
+		}
+		float ReadFloat(int index) const
+		{
+			static_assert(sizeof(Uint32) == sizeof(float));
+			if(index < 0 || index + (int)sizeof(float) > length)
+				throw GameException{ "Buffer::ReadFloat: out of range" };
+			union { float f; Uint32 i; } u;
+			u.i = SDLNet_Read32(&bytes[index]);
+			return u.f;
+		}
+		void MakeNewFront(int newStartIndex)
+		{
+			if(newStartIndex < 0 || newStartIndex > length)
+				throw GameException{ "Buffer::MakeNewFront: out of range" };
+			if(newStartIndex == 0)
+				return;
+			int newLength{ length - newStartIndex };
+			if(newLength > 0)
+				memmove(FirstBytePtr(), &bytes[newStartIndex], newLength);
+			length = newLength;
+		}
+	};
+
+	enum class Side
+	{
+		LEFT,
+		RIGHT
+	};
 	class Player
 	{
 	public:
-		void Init(Side newSide, bool newIsHuman);
+		void Init(Side newSide);
 		void ResetRound();
+		unsigned GetScore() const;
+		void ScorePoint();
 		Side GetSide() const;
 		const b2Vec2& GetPosition() const;
-		unsigned GetScore() const;
-		void Score();
 		bool IsReady() const;
 		void SetReady();
 		void SetMovementFactor(float factor);
+		void SetY(float newY);
 		void Update(float dt);
-		void Draw();
+		void Draw() const;
 
 	private:
 		unsigned m_score;
 		Side m_side;
-		bool m_isHuman;
 
 		b2Vec2 m_position;	// Lower-left corner
 		float m_movementFactor;
@@ -73,10 +144,11 @@ namespace Pong
 	{
 	public:
 		void ResetRound();
-		//bool GotPastPlayer() const;
 		bool Scored() const;
 		void Update(float dt, Player& player1, Player& player2);
-		void Draw();
+		const b2Vec2& GetPosition() const;
+		void SetPosition(const b2Vec2& position);
+		void Draw() const;
 
 	private:
 		b2Vec2 m_position;	// Lower-left corner
@@ -92,16 +164,13 @@ namespace Pong
 	class Game
 	{
 	public:
-		void Init(bool twoPlayers);
+		void Init();
 		void Update(float dt);
-		//void Update(float dt, PlayerController& playerController);
-		void Draw();
+		void Draw() const;
 
-		bool TwoPlayers() const;
-		GameState GetState() const;
+		~Game();
+		void OnQuit();
 
-		bool WaitingForPlayer1() const;
-		bool WaitingForPlayer2() const;
 		void Player1PressedAButton();
 		void Player2PressedAButton();
 		void SetPlayer1MovementFactor(float factor); // [-1.0,1.0]
@@ -110,57 +179,101 @@ namespace Pong
 	private:
 		void ResetRound();
 
-		bool m_twoPlayers;
-		GameState m_state;
+		void UpdateWaitForClientConnection(float dt);
+		void UpdateConfirmPlayersReady(float dt);
+		void UpdateCountdown(float dt);
+		void UpdatePlay(float dt);
+
+		void DrawPlayerResult(Side playerSide, bool isWinner) const;
+		void DrawCountdown() const;
+		void DrawScore(const Player& player) const;
+		void DrawWaitingMessage(const Player& player) const;
+
+		bool IsClient() const;
+		bool IsServer() const;
+		bool IsNetworked() const;
+		void InitNetwork();
+		void CloseNetwork();
+		void SendNetworkData();
+		void CheckMessages();
+		bool SocketReady() const;
+		void ReceiveNetworkData(Buffer& dataOut);
+		void ProcessMessages(Buffer& data);
+		// Returns start of next message
+		int ProcessMessage(const Buffer& data, int first);
+
+		// Game
+		enum class GameState
+		{
+			WAIT_FOR_CLIENT_CONNECTION,
+			CONFIRM_PLAYERS_READY,
+			COUNTDOWN,
+			PLAY,
+			GAME_OVER
+		} m_state;
 		Player m_player1, m_player2;
 		Puck m_puck;
-
 		float m_countdownSecondsLeft;
+
+		// Network
+		GameInitSettings::Mode m_mode;
+		NetworkDef m_networkSettings;
+		TCPsocket m_serverSocketTCP{ nullptr };
+		TCPsocket m_clientSocketTCP{ nullptr };
+		SDLNet_SocketSet m_socketSet{ nullptr };
+		const Uint32 m_checkForClientConnectionTimeoutMilliseconds{ 15 };
+		Buffer m_networkInputBuffer;
+		Buffer m_networkOutputBuffer;
 
 		// Assets
 		d2d::FontReference m_orbitronLightFont{ "Fonts\\OrbitronLight.otf" };
 
 		// Text
-		float edgeGap{ 0.015f };
+		const b2Vec2 edgeGapPercent{ 0.015f, 0.015f };
 
-		d2d::TextBlock m_fps{ "0", b2Vec2(1.0f - edgeGap, 1.0f - edgeGap),
-			d2d::Alignment::RIGHT_TOP,
-			0.05f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		// FPS text
+		const b2Vec2 m_fpsPosition{ GAME_RECT.GetPointAtPercent(b2Vec2{1.0f, 1.0f } - edgeGapPercent) };
+		const d2d::Alignment m_fpsAlignment{ d2d::Alignment::RIGHT_TOP };
+		const d2d::TextStyle m_fpsTextStyle{ m_orbitronLightFont, { 1.0f, 1.0f, 0.0f }, 0.05f * GAME_RECT.GetHeight() };
 
-		d2d::TextBlock m_player1Score{ "0", b2Vec2(0.5f - edgeGap, 1.0f - edgeGap),
-			d2d::Alignment::RIGHT_TOP,
-			0.05f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		// Score text
+		const b2Vec2 m_scoreLeftPosition{ GAME_RECT.GetPointAtPercent({ 0.5f - edgeGapPercent.x, 1.0f - edgeGapPercent.y }) };
+		const d2d::Alignment m_scoreLeftAlignment{ d2d::Alignment::RIGHT_TOP };
+		
+		const b2Vec2 m_scoreRightPosition{ GAME_RECT.GetPointAtPercent({ 0.5f + edgeGapPercent.x, 1.0f - edgeGapPercent.y }) };
+		const d2d::Alignment m_scoreRightAlignment{ d2d::Alignment::LEFT_TOP };
+		
+		const d2d::TextStyle m_scoreTextStyle{ m_orbitronLightFont, { 1.0f, 1.0f, 0.0f }, 0.05f * GAME_RECT.GetHeight() };
 
-		d2d::TextBlock m_player2Score{ "0", b2Vec2(0.5f + edgeGap, 1.0f - edgeGap),
-			d2d::Alignment::LEFT_TOP,
-			0.05f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		// Waiting for client text
+		const std::string m_waitingForClientText{ "Waiting for client to connect..." };
 
-		d2d::TextBlock m_countdown{ "0", b2Vec2(0.5f, 0.5f),
-			d2d::Alignment::CENTERED,
-			0.05f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		// Waiting for player text
+		const std::string m_waitingForRemotePlayerText{ "Waiting for player to press a button..." };
 
-		d2d::TextBlock m_player1Waiting{ "Press W or S when ready", b2Vec2(0.25f, 0.5f),
-			d2d::Alignment::CENTERED,
-			0.025f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		const std::string m_waitingForPlayerLeftText{ "Press W or S when ready" };
+		const b2Vec2 m_waitingForPlayerLeftPosition{ GAME_RECT.GetPointAtPercent({ 0.25f, 0.5f }) };
+		const d2d::Alignment m_waitingForPlayerLeftAlignment{ d2d::Alignment::CENTERED };
 
-		d2d::TextBlock m_player2Waiting{ "Press UP or DOWN when ready", b2Vec2(0.75f, 0.5f),
-			d2d::Alignment::CENTERED,
-			0.025f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		const std::string m_waitingForPlayerRightText{ "Press UP or DOWN when ready" };
+		const b2Vec2 m_waitingForPlayerRightPosition{ GAME_RECT.GetPointAtPercent({ 0.75f, 0.5f }) };
+		const d2d::Alignment m_waitingForPlayerRightAlignment{ d2d::Alignment::CENTERED };
 
-		d2d::TextBlock m_playerWins{ " ", b2Vec2(0.5f, 0.5f),
-			d2d::Alignment::CENTERED,
-			0.05f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		const d2d::TextStyle m_waitingForPlayerTextStyle{ m_orbitronLightFont, { 1.0f, 1.0f, 0.0f }, 0.05f * GAME_RECT.GetHeight() };
 
-		d2d::TextBlock m_youLose{ "You Lose", b2Vec2(0.5f, 0.5f),
-			d2d::Alignment::CENTERED,
-			0.05f, m_orbitronLightFont.GetID(),
-			d2d::Color(1.0f, 1.0f, 0.0f, 1.0f) };
+		// Countdown text
+		const b2Vec2 m_countdownPosition{ GAME_RECT.GetCenter() };
+		const d2d::Alignment m_countdownAlignment{ d2d::Alignment::CENTERED };
+		const d2d::TextStyle m_countdownTextStyle{ m_orbitronLightFont, { 1.0f, 1.0f, 0.0f }, 0.20f * GAME_RECT.GetHeight() };
+
+		// Result text
+		const std::string m_playerWinsText{ "You win!" };
+		const std::string m_playerLosesText{ "You lose!" };
+		const b2Vec2 m_playerResultLeftPosition{ GAME_RECT.GetPointAtPercent({ 0.25f, 0.5f }) };
+		const b2Vec2 m_playerResultRightPosition{ GAME_RECT.GetPointAtPercent({ 0.75f, 0.5f }) };
+		const d2d::Alignment m_playerResultLeftAlignment{ d2d::Alignment::CENTERED };
+		const d2d::Alignment m_playerResultRightAlignment{ d2d::Alignment::CENTERED };
+		const d2d::TextStyle m_playerWinsTextStyle{ m_orbitronLightFont, { 0.1f, 0.9f, 0.1f }, 0.10f * GAME_RECT.GetHeight() };
+		const d2d::TextStyle m_playerLosesTextStyle{ m_orbitronLightFont, { 0.6f, 0.1f, 0.1f }, 0.10f * GAME_RECT.GetHeight() };
 	};
 }

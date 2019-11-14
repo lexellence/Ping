@@ -10,38 +10,30 @@
 #include "pch.h"
 #include "Gameplay.h"
 #include "Game.h"
-#include "MainMenu.h"
-#include "d2d.h"
+#include "AppState.h"
+#include "Exceptions.h"
 
 namespace Pong
 {
-	Gameplay::Gameplay(bool twoPlayers)
+	void Gameplay::Init()
 	{
-		/*
-		// If the screen aspect ratio is too big or small, clamp the game aspect ratio to reasonable proportions
-		double screenAspectRatio = d2d::Renderer::GetXYAspectRatio();
-		double m_gameWidth, m_gameHeight;
-		if (screenAspectRatio > m_maxGameApectRatio)
-		{
-			// Screen will be wider than game
-			m_gameWidth = m_maxGameApectRatio * m_defaultHeight;
-			m_gameHeight = m_defaultHeight;
-		}
-		else if (screenAspectRatio < m_minGameApectRatio)
-		{
-			// Screen will be taller than game
-			m_gameWidth = m_defaultWidth;
-			m_gameHeight = m_defaultWidth / m_minGameApectRatio;
-		}
-		else
-		{
-			// Screen will be completely filled by game
-			m_gameWidth = m_defaultWidth;
-			m_gameHeight = m_defaultWidth / screenAspectRatio;
-		}*/
+		m_gotoMenu = false;
+		m_player1Up = false;
+		m_player1Down = false;
+		m_player2Up = false;
+		m_player2Down = false;
 
-		// Start game
-		m_game.Init(twoPlayers);
+		try {
+			m_game.Init();
+		}
+		catch(const GameException & e) {
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Game Initialization Error", e.what(), nullptr);
+			m_gotoMenu = true;
+		}
+
+		d2d::Window::SetClearColor(d2d::BLACK_OPAQUE);
+
+		//m_showFPS = true;
 	}
 	void Gameplay::ProcessEvent(const SDL_Event& event)
 	{
@@ -88,6 +80,8 @@ namespace Pong
 				break;
 			} 
 			break;
+
+		// Controller logic
 		/*
 		case SDL_CONTROLLERBUTTONDOWN:
 			switch(event.cbutton.button)
@@ -140,42 +134,49 @@ namespace Pong
 			*/
 		}
 	}
-	std::shared_ptr<d2d::GameState> Gameplay::Update(float deltaSeconds)
-	{		
+	AppStateID Gameplay::Update(float dt)
+	{
+		if(!m_gotoMenu)
+		{
+			try {
+				MapInputToGameActions();
+				m_game.Update(dt);
+			}
+			catch(const GameException & e) {
+				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Game Update Error", e.what(), nullptr);
+				m_gotoMenu = true;
+			}
+		}
+
 		if(m_gotoMenu)
 		{
-			return std::make_shared<MainMenu>();
+			m_game.OnQuit();
+			return AppStateID::MAIN_MENU;
 		}
-		MapInputToGameActions();
 
-		m_game.Update(deltaSeconds);
-
-		return shared_from_this();
+		return AppStateID::GAMEPLAY;
 	}
 	void Gameplay::MapInputToGameActions()
 	{
 		// Map Player1 controller to game
 		if (m_player1Up && !m_player1Down)
-			m_game.SetPlayer1MovementFactor(1.0);
+			m_game.SetPlayer1MovementFactor(1.0f);
 		else if (!m_player1Up && m_player1Down)
-			m_game.SetPlayer1MovementFactor(-1.0);
+			m_game.SetPlayer1MovementFactor(-1.0f);
 		else
-			m_game.SetPlayer1MovementFactor(0.0);
+			m_game.SetPlayer1MovementFactor(0.0f);
 
-		if (m_game.TwoPlayers())
-		{
-			// Map Player2 controller to game
-			if (m_player2Up && !m_player2Down)
-				m_game.SetPlayer2MovementFactor(1.0);
-			else if (!m_player2Up && m_player2Down)
-				m_game.SetPlayer2MovementFactor(-1.0);
-			else
-				m_game.SetPlayer2MovementFactor(0.0);
-		}
+		// Map Player2 controller to game
+		if (m_player2Up && !m_player2Down)
+			m_game.SetPlayer2MovementFactor(1.0f);
+		else if (!m_player2Up && m_player2Down)
+			m_game.SetPlayer2MovementFactor(-1.0f);
+		else
+			m_game.SetPlayer2MovementFactor(0.0f);
 	}
 	void Gameplay::Draw()
 	{
-		d2d::Renderer::SetShowCursor(false);
+		d2d::Window::SetShowCursor(false);
 		m_game.Draw();
 	}
 }

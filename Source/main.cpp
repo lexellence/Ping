@@ -20,8 +20,7 @@ int main(int argc, char *argv[])
 	catch(const std::exception & e)
 	{
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Fatal Exception", e.what(), nullptr);
-		return EXIT_FAILURE;
+		return 1;
 	}
-	return EXIT_SUCCESS;
-
+	return 0;
 }

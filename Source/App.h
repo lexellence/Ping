@@ -1,31 +1,45 @@
 /**************************************************************************************\
 ** File: App.h
-** Project: Pong
+** Project: 
 ** Author: David Leksen
-** Date:
+** Date: 
 **
 ** Header file for the App class
 **
 \**************************************************************************************/
 #pragma once
-#include "d2d.h"
+#include "AppState.h"
+#include "Intro.h"
+#include "MainMenu.h"
+#include "Gameplay.h"
+#include "Exceptions.h"
 
-namespace Pong 
+namespace Pong
 {
-	class App : public d2d::Application
+	const AppStateID FIRST_APP_STATE{ AppStateID::INTRO };
+	const float MAX_APP_STEP{ 1.0f };
+	class App
 	{
-	protected:
-		bool Init();
-		bool Tick();
+	public:
+		~App();
+		void Run();
+	private:
+		void Init();
+		void Step(float dt);
+
+		std::shared_ptr<AppState> GetStatePtr(AppStateID appState);
+		//void InitCurrentState();
+		void UpdateCurrentState(float dt);
+		//void DrawCurrentState();
 		void Shutdown();
-		/*void AddController(int deviceIndex);
-		void RemoveController(int joystickID);*/
 
-		std::string m_logFilename{ "Pong.log" };
+		std::shared_ptr<Intro> m_introPtr;
+		std::shared_ptr<MainMenu> m_mainMenuPtr;
+		std::shared_ptr<Gameplay> m_gameplayPtr;
 
-		d2d::Timer m_timer;
-		std::shared_ptr<d2d::GameState> m_currentStatePtr;
-		/*int m_controller1JoystickID{ -1 };
-		int m_controller2JoystickID{ -1 };*/
+		AppStateID m_currentState{ FIRST_APP_STATE };
+		AppStateID m_nextState{ FIRST_APP_STATE };
+
+		bool m_hasFocus;
 	};
 }

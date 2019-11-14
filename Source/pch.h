@@ -14,7 +14,7 @@
 //		3 enable d2AssertParanoid 
 #define D2_ASSERT_LEVEL 2
 
-#include <Box2D/Box2D.h>
+/*#include <Box2D/Box2D.h>
 #include <SDL.h>
 
 #include <cassert>
@@ -28,4 +28,5 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
+#include <math.h>*/
+#include "d2d.h"
