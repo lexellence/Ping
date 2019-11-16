@@ -1,12 +1,5 @@
 {
-    client:
-    {
-        remoteIP: "127.0.0.1"
-        remotePort: 8909
-        localPort: 8910
-    }
-    server:
-    {
-        localPort: 8909
-    }
+	serverIP: "127.0.0.1"
+    serverPort: 8909
+	clientUDPPort: 8910
 }

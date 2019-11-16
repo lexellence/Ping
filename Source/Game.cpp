@@ -26,21 +26,28 @@ namespace Pong
 	}
 	void Game::OnQuit()
 	{
+		// Send quit message
+		if(IsNetworked() && m_state == GameState::CONFIRM_PLAYERS_READY ||
+			m_state == GameState::COUNTDOWN || 
+			m_state == GameState::PLAY)
+		{
+			m_outputBufferTCP.WriteByte(TCP_MESSAGE_PLAYER_QUIT);
+			SendNetworkData();
+		}
+
 		CloseNetwork();
 	}
 
 	void Game::Init()
 	{
-		m_mode = GameInitSettings::GetGameMode();
-
 		m_player1.Init(Side::LEFT);
 		m_player2.Init(Side::RIGHT);
 		m_puck.ResetRound();
 
-		if (IsNetworked())
+		if(IsNetworked())
 			InitNetwork();
 
-		if (IsServer())
+		if(IsServer())
 			m_state = GameState::WAIT_FOR_CLIENT_CONNECTION;
 		else
 			m_state = GameState::CONFIRM_PLAYERS_READY;
@@ -55,137 +62,158 @@ namespace Pong
 
 	void Game::InitNetwork()
 	{
+		// Double check that we need network
+		if(!IsNetworked())
+			return;
+
 		// Make sure we start fresh
 		CloseNetwork();
-
-		// Double check that we need network
-		if (!IsNetworked())
-			return;
 
 		// Get our IP addresses and port numbers from file
 		m_networkSettings.LoadFrom("Data\\network.hjson");
 
 		// Allocate memory for socket set
+		SDLNet_SetError("");
 		m_socketSet = SDLNet_AllocSocketSet(1);
-		if (!m_socketSet)
+		if(!m_socketSet)
 			throw GameException{ std::string{"Unable to allocate socket set: "} +SDLNet_GetError() };
 
 		// Server: open port to allow clients to connect
-		if (IsServer())
+		if(IsServer())
 		{
-			d2LogInfo << "Attempting to open port " << m_networkSettings.server.localPort;
+			d2LogInfo << "Attempting to open port " << m_networkSettings.serverPort;
 
 			// Get proper host format
 			IPaddress myIP;
-			if (SDLNet_ResolveHost(&myIP, nullptr, m_networkSettings.server.localPort) != 0)
-				throw GameException{ std::string{"Failed to resolve local port "} +d2d::ToString(m_networkSettings.server.localPort) + ": " + SDLNet_GetError() };
+			if(SDLNet_ResolveHost(&myIP, nullptr, m_networkSettings.serverPort) != 0)
+				throw GameException{ std::string{"Failed to resolve local port "} +d2d::ToString(m_networkSettings.serverPort) + ": " + SDLNet_GetError() };
 
 			// Open port
-			if (!(m_serverSocketTCP = SDLNet_TCP_Open(&myIP)))
-				throw GameException{ std::string{"TCP: Failed to open port "} +d2d::ToString(m_networkSettings.server.localPort) + " for listening: " + SDLNet_GetError() };
+			if(!(m_serverSocketTCP = SDLNet_TCP_Open(&myIP)))
+				throw GameException{ std::string{"TCP: Failed to open port "} +d2d::ToString(m_networkSettings.serverPort) + " for listening: " + SDLNet_GetError() };
 
 			// Add server socket to set so we don't have to block while waiting for client
-			if (SDLNet_TCP_AddSocket(m_socketSet, m_serverSocketTCP) == -1)
+			if(SDLNet_TCP_AddSocket(m_socketSet, m_serverSocketTCP) == -1)
 				throw GameException{ std::string{"Failed to add server TCP socket to socket set: "} +SDLNet_GetError() };
 
 			// Print success confirmation
 			d2LogInfo << "Opened port " << d2d::GetPort(myIP) << ". Waiting for client connection...";
 		}
+
 		// Client: connect to server
 		else
 		{
-			d2LogInfo << "Attempting to connect to " << m_networkSettings.client.remoteIP << " port " << m_networkSettings.client.remotePort;
+			d2LogInfo << "Attempting to connect to " << m_networkSettings.serverIP << " port " << m_networkSettings.serverPort;
 
 			// Get proper host format
 			IPaddress serverIP;
-			if (SDLNet_ResolveHost(&serverIP, m_networkSettings.client.remoteIP.c_str(), m_networkSettings.client.remotePort) != 0)
-				throw GameException{ std::string{"Failed to resolve host "} +m_networkSettings.client.remoteIP +
-					" Port " + d2d::ToString(m_networkSettings.client.remotePort) + ": " + SDLNet_GetError() };
+			SDLNet_SetError("");
+			if(SDLNet_ResolveHost(&serverIP, m_networkSettings.serverIP.c_str(), m_networkSettings.serverPort) != 0)
+				throw GameException{ std::string{"Failed to resolve host "} +m_networkSettings.serverIP +
+					" Port " + d2d::ToString(m_networkSettings.serverPort) + ": " + SDLNet_GetError() };
 
 			// Connect to server's open port
-			if (!(m_clientSocketTCP = SDLNet_TCP_Open(&serverIP)))
-				throw GameException{ std::string{"TCP: Failed to connect to port "} +d2d::ToString(m_networkSettings.client.remotePort) +
-					" at " + m_networkSettings.client.remoteIP + ": " + SDLNet_GetError() };
-
-			// Add client socket to set so we don't have to block to send/receive
-			if (SDLNet_TCP_AddSocket(m_socketSet, m_clientSocketTCP) == -1)
-				throw GameException{ std::string{"Failed to add client TCP socket to socket set: "} +SDLNet_GetError() };
+			if(!(m_clientSocketTCP = SDLNet_TCP_Open(&serverIP)))
+				throw GameException{ std::string{"TCP: Failed to connect to port "} +d2d::ToString(m_networkSettings.serverPort) +
+					" at " + m_networkSettings.serverIP + ": " + SDLNet_GetError() };
 
 			// Print out the server's IP and port
 			d2LogInfo << d2d::GetIPOctetsString(serverIP) << " port " << d2d::GetPort(serverIP)
 				<< " accepted a connection";
+
+			// Add client socket to set so we don't have to block to send/receive
+			SDLNet_SetError("");
+			if(SDLNet_TCP_AddSocket(m_socketSet, m_clientSocketTCP) == -1)
+				throw GameException{ std::string{"Failed to add client TCP socket to socket set: "} +SDLNet_GetError() };
+
+			// Open local UDP port
+			SDLNet_SetError("");
+			if(!(m_clientSocketUDP = SDLNet_UDP_Open(m_networkSettings.clientUDPPort)))
+				throw GameException{ std::string{"UDP: Failed to open port "} +
+					d2d::ToString(m_networkSettings.clientUDPPort) + ": " + SDLNet_GetError() };
+
+			d2LogInfo << "Opened UDP port " << m_networkSettings.clientUDPPort;
+
+			// Allocate in/out UDP packets
+			if(!(m_inputUDPPacketPtr = SDLNet_AllocPacket(BUFFER_SIZE)))
+				throw GameException{ "Failed to allocate input UDP packet: Out of memory" };
+			if(!(m_outputUDPPacketPtr = SDLNet_AllocPacket(BUFFER_SIZE)))
+				throw GameException{ "Failed to allocate output UDP packet: Out of memory" };
+
+			// Set address of outgoing UDP packets
+			m_outputUDPPacketPtr->address = serverIP;
+
+			d2LogInfo << "Address of outgoing packets set to "
+				<< d2d::GetIPOctetsString(serverIP) << " port " << d2d::GetPort(serverIP);
 		}
 
-		/*Uint16 updPort;
-		if(GameInitSettings::GetGameMode() == GameInitSettings::Mode::SERVER)
-			updPort = m_udpServerPort;
-		else
-			updPort = 0;
-		m_socketUDP = SDLNet_UDP_Open(updPort);
-		if(!m_socketUDP)
-			throw GameException{ std::string{"Unable to open UDP connection: "} +SDLNet_GetError() };
-			*/
-
-			//if(SDLNet_UDP_AddSocket(m_socketSet, m_socketUDP) == -1)
-			//	throw GameException{ std::string{"Unable to add UDP socket to socket set: "} +SDLNet_GetError() };
+		// Reset UDP sequence numbers
+		m_nextUDPSequenceNum = 0;
+		m_lastUDPCountdownSequenceNum = 0;
+		m_lastUDPPuckSequenceNum = 0;
+		m_lastUDPPlayerSequenceNum = 0;
 	}
 	void Game::CloseNetwork()
 	{
-		if (m_serverSocketTCP)
+		// Clear the message queue
+		m_inputBufferTCP.Clear();
+		m_outputBufferTCP.Clear();
+		m_inputBufferUDP.Clear();
+		m_outputBufferUDP.Clear();
+
+		// Delete UDP packets
+		if(m_inputUDPPacketPtr)
 		{
-			if (SDLNet_TCP_DelSocket(m_socketSet, m_serverSocketTCP) == -1)
-			{
-				std::string message{ "Could not delete TCP socket from socket set: " };
-				message += SDLNet_GetError();
-				d2LogWarning << message;
-				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Warning", message.c_str(), nullptr);
-			}
+			SDLNet_FreePacket(m_inputUDPPacketPtr);
+			m_inputUDPPacketPtr = nullptr;
+		}
+		if(m_outputUDPPacketPtr)
+		{
+			SDLNet_FreePacket(m_outputUDPPacketPtr);
+			m_outputUDPPacketPtr = nullptr;
+		}
+
+		// Remove sockets from set, close sockets, and free socket set
+		if(m_serverSocketTCP)
+		{
+			SDLNet_TCP_DelSocket(m_socketSet, m_serverSocketTCP);
 			SDLNet_TCP_Close(m_serverSocketTCP);
 			m_serverSocketTCP = nullptr;
 		}
-		if (m_clientSocketTCP)
+		if(m_clientSocketTCP)
 		{
+			SDLNet_TCP_DelSocket(m_socketSet, m_clientSocketTCP);
 			SDLNet_TCP_Close(m_clientSocketTCP);
 			m_clientSocketTCP = nullptr;
 		}
-		/*if(m_socketUDP)
+		if(m_clientSocketUDP)
 		{
-			if(SDLNet_UDP_DelSocket(m_socketSet, m_socketUDP) == -1)
-			{
-				std::string message{ "Could not delete UDP socket from socket set: " };
-				message += SDLNet_GetError();
-				d2LogWarning << message;
-				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Warning", message.c_str(), nullptr);
-			}
-			SDLNet_UDP_Close(m_socketUDP);
-			m_socketUDP = nullptr;
-		}*/
-		if (m_socketSet)
+			SDLNet_UDP_Close(m_clientSocketUDP);
+			m_clientSocketUDP = nullptr;
+		}
+		if(m_socketSet)
 		{
 			SDLNet_FreeSocketSet(m_socketSet);
 			m_socketSet = nullptr;
 		}
-
-		// Clear the message queue
-		m_networkInputBuffer.length = 0;
 	}
 
 	void Game::Player1PressedAButton()
 	{
-		if (m_state == GameState::CONFIRM_PLAYERS_READY && !IsClient())
+		if(m_state == GameState::CONFIRM_PLAYERS_READY && !IsClient())
 		{
 			m_player1.SetReady();
-			if (IsServer())
-				m_networkOutputBuffer.WriteByte(MESSAGE_PLAYER_READY);
+			if(IsServer())
+				m_outputBufferTCP.WriteByte(TCP_MESSAGE_PLAYER_READY);
 		}
 	}
 	void Game::Player2PressedAButton()
 	{
-		if (m_state == GameState::CONFIRM_PLAYERS_READY && !IsServer())
+		if(m_state == GameState::CONFIRM_PLAYERS_READY && !IsServer())
 		{
 			m_player2.SetReady();
-			if (IsClient())
-				m_networkOutputBuffer.WriteByte(MESSAGE_PLAYER_READY);
+			if(IsClient())
+				m_outputBufferTCP.WriteByte(TCP_MESSAGE_PLAYER_READY);
 		}
 	}
 	void Game::SetPlayer1MovementFactor(float factor)
@@ -196,7 +224,7 @@ namespace Pong
 	{
 		m_player2.SetMovementFactor(factor);
 	}
-	
+
 	void Game::Draw() const
 	{
 		b2Vec2 gameDim{ GAME_RECT.GetWidth(), GAME_RECT.GetHeight() };
@@ -207,7 +235,7 @@ namespace Pong
 				float screenAspectRatio{ d2d::Window::GetXYAspectRatio() };
 
 				// Fill as much of screen as possible while maintaining game aspect ratio
-				if (screenAspectRatio > gameAspectRatio)
+				if(screenAspectRatio > gameAspectRatio)
 				{
 					// Screen will be wider than game
 					float cameraWidth{ screenAspectRatio * gameDim.y };
@@ -250,7 +278,7 @@ namespace Pong
 
 		// Draw text
 		{
-			switch (m_state)
+			switch(m_state)
 			{
 			case GameState::WAIT_FOR_CLIENT_CONNECTION:
 				d2d::Window::PushMatrix();
@@ -261,9 +289,9 @@ namespace Pong
 				d2d::Window::PopMatrix();
 				break;
 			case GameState::CONFIRM_PLAYERS_READY:
-				if (!m_player1.IsReady())
+				if(!m_player1.IsReady())
 					DrawWaitingMessage(m_player1);
-				if (!m_player2.IsReady())
+				if(!m_player2.IsReady())
 					DrawWaitingMessage(m_player2);
 				break;
 			case GameState::COUNTDOWN:
@@ -272,6 +300,10 @@ namespace Pong
 			case GameState::GAME_OVER:
 				DrawPlayerResult(m_player1.GetSide(), m_player1.GetScore() > m_player2.GetScore());
 				DrawPlayerResult(m_player2.GetSide(), m_player2.GetScore() > m_player1.GetScore());
+				break;
+			case GameState::GAME_OVER_DEFAULT_WIN:
+				DrawPlayerResult(m_player1.GetSide(), IsServer() ? true : false);
+				DrawPlayerResult(m_player2.GetSide(), IsServer() ? false : true);
 				break;
 			}
 			DrawScore(m_player1);
@@ -293,13 +325,13 @@ namespace Pong
 
 		d2d::Window::PushMatrix();
 		d2d::Window::SetColor(resultTextStyle.color);
-		if (playerSide == Side::LEFT && !IsClient())
+		if(playerSide == Side::LEFT && !IsClient())
 		{
 			d2d::Window::Translate(m_playerResultLeftPosition);
 			d2d::Window::DrawString(resultText, m_playerResultLeftAlignment,
 				resultTextStyle.size, resultTextStyle.font);
 		}
-		else if (playerSide == Side::RIGHT && !IsServer())
+		else if(playerSide == Side::RIGHT && !IsServer())
 		{
 			d2d::Window::Translate(m_playerResultRightPosition);
 			d2d::Window::DrawString(resultText, m_playerResultRightAlignment,
@@ -310,7 +342,7 @@ namespace Pong
 	void Game::DrawCountdown() const
 	{
 		int countdownInt = (int)(m_countdownSecondsLeft + SLIGHTLY_LESS_THAN_ONE);
-		if (countdownInt > 0)
+		if(countdownInt > 0)
 		{
 			d2d::Window::PushMatrix();
 			d2d::Window::Translate(m_countdownPosition);
@@ -326,7 +358,7 @@ namespace Pong
 
 		d2d::Window::PushMatrix();
 		d2d::Window::SetColor(m_scoreTextStyle.color);
-		if (player.GetSide() == Side::LEFT)
+		if(player.GetSide() == Side::LEFT)
 		{
 			d2d::Window::Translate(m_scoreLeftPosition);
 			d2d::Window::DrawString(scoreText, m_scoreLeftAlignment,
@@ -344,30 +376,20 @@ namespace Pong
 	{
 		d2d::Window::PushMatrix();
 		d2d::Window::SetColor(m_waitingForPlayerTextStyle.color);
-		if (player.GetSide() == Side::LEFT)
+		if(player.GetSide() == Side::LEFT)
 		{
 			// Different text for remote player
-			const std::string* textPtr{ nullptr };
-			if (IsClient())
-				textPtr = &m_waitingForRemotePlayerText;
-			else
-				textPtr = &m_waitingForPlayerLeftText;
-
+			const std::string& textRef = IsClient() ? m_waitingForRemotePlayerText : m_waitingForPlayerLeftText;
 			d2d::Window::Translate(m_waitingForPlayerLeftPosition);
-			d2d::Window::DrawString(m_waitingForPlayerLeftText, m_waitingForPlayerLeftAlignment,
+			d2d::Window::DrawString(textRef, m_waitingForPlayerLeftAlignment,
 				m_waitingForPlayerTextStyle.size, m_waitingForPlayerTextStyle.font);
 		}
 		else
 		{
 			// Different text for remote player
-			const std::string* textPtr{ nullptr };
-			if (IsServer())
-				textPtr = &m_waitingForRemotePlayerText;
-			else
-				textPtr = &m_waitingForPlayerRightText;
-
+			const std::string& textRef = IsServer() ? m_waitingForRemotePlayerText : m_waitingForPlayerRightText;
 			d2d::Window::Translate(m_waitingForPlayerRightPosition);
-			d2d::Window::DrawString(m_waitingForPlayerRightText, m_waitingForPlayerRightAlignment,
+			d2d::Window::DrawString(textRef, m_waitingForPlayerRightAlignment,
 				m_waitingForPlayerTextStyle.size, m_waitingForPlayerTextStyle.font);
 		}
 		d2d::Window::PopMatrix();
@@ -376,7 +398,7 @@ namespace Pong
 	void Game::Update(float dt)
 	{
 		// Update
-		switch (m_state)
+		switch(m_state)
 		{
 		case GameState::WAIT_FOR_CLIENT_CONNECTION:
 			UpdateWaitForClientConnection(dt);
@@ -391,123 +413,187 @@ namespace Pong
 			UpdatePlay(dt);
 			break;
 		case GameState::GAME_OVER:
+		case GameState::GAME_OVER_DEFAULT_WIN:
 			break;
 		default:
 			break;
 		}
 
-		// Process network input
-		if (IsNetworked() && m_state != GameState::WAIT_FOR_CLIENT_CONNECTION)
+		// Process network input/output
+		if(IsNetworked() &&
+			m_state == GameState::CONFIRM_PLAYERS_READY ||
+			m_state == GameState::COUNTDOWN ||
+			m_state == GameState::PLAY)
+		{
 			CheckMessages();
-
-		// Process network output
-		if (IsNetworked() && m_state != GameState::WAIT_FOR_CLIENT_CONNECTION)
 			SendNetworkData();
+		}
 	}
 	void Game::SendNetworkData()
 	{
-		if (m_networkOutputBuffer.length > 0)
+		if(m_outputBufferTCP.length > 0)
 		{
-			int bytesSent = SDLNet_TCP_Send(m_clientSocketTCP, m_networkOutputBuffer.bytes, m_networkOutputBuffer.length);
-			if (bytesSent < m_networkOutputBuffer.length)
-				throw GameException{ std::string{"Failed to send network data: "} +d2d::ToString(m_networkOutputBuffer.length) +
-					" bytes attempted, " + d2d::ToString(bytesSent) + " bytes successfully sent: " + SDLNet_GetError() };
-			m_networkOutputBuffer.length = 0;
+			if(m_clientSocketTCP)
+			{
+				SDLNet_SetError("");
+				int bytesSent = SDLNet_TCP_Send(m_clientSocketTCP, m_outputBufferTCP.bytes, m_outputBufferTCP.length);
+				if(bytesSent < m_outputBufferTCP.length)
+					throw GameException{ std::string{"Failed to send TCP data: "} +d2d::ToString(m_outputBufferTCP.length) +
+						" bytes attempted, " + d2d::ToString(bytesSent) + " bytes successfully sent: " + SDLNet_GetError() };
+				m_outputBufferTCP.Clear();
+			}
+		}
+		if(m_outputBufferUDP.length > 0)
+		{
+			if(m_clientSocketUDP && m_outputUDPPacketPtr)
+			{
+				// Copy buffer to packet
+				memcpy(m_outputUDPPacketPtr->data, m_outputBufferUDP.FirstBytePtr(), m_outputBufferUDP.length);
+				m_outputUDPPacketPtr->len = m_outputBufferUDP.length;
+
+				// Send packet
+				SDLNet_SetError("");
+				d2LogInfo << "Sending UDP packet with " << m_outputUDPPacketPtr->len << " bytes";
+				int packetsSent = SDLNet_UDP_Send(m_clientSocketUDP, -1, m_outputUDPPacketPtr);
+				if(packetsSent < 1)
+					throw GameException{ std::string{"Failed to send UDP packet of "} +d2d::ToString(m_outputBufferUDP.length) +
+						" bytes: " + SDLNet_GetError() };
+				m_outputBufferUDP.Clear();
+			}
 		}
 	}
 	void Game::CheckMessages()
 	{
-		while (SocketReady())
+		// UDP messages
+		while(GetDataUDP())
 		{
-			ReceiveNetworkData(m_networkInputBuffer);
-			if (m_networkInputBuffer.IsOverflowing())
+			if(m_inputBufferUDP.IsOverflowing())
 				throw GameException{ "Buffer overflow error" };
-
-			if (m_networkInputBuffer.length > 0)
-				ProcessMessages(m_networkInputBuffer);
-			if (m_networkInputBuffer.IsFull())
-				throw GameException{ "Buffer full error: Increase buffer size." };
+			if(m_inputBufferUDP.length > 0)
+				ProcessMessagesUDP(m_inputBufferUDP);
 		}
-	}
-	bool Game::SocketReady() const
-	{
-		errno = 0;
-		int numSocketsReady = SDLNet_CheckSockets(m_socketSet, 0);
-		if (numSocketsReady == -1)
+
+		// TCP messages
+		while(TCPReady())
 		{
-			throw GameException{ std::string{"Failed to check sockets: "} +
-				SDLNet_GetError() + " (errno = " + d2d::ToString(errno) + ")" };
+			GetDataTCP();
+			if(m_inputBufferTCP.IsOverflowing())
+				throw GameException{ "Buffer overflow error" };
+			if(m_inputBufferTCP.length > 0)
+				ProcessMessagesTCP(m_inputBufferTCP);
+			if(m_inputBufferTCP.IsFull())
+				throw GameException{ "Buffer full error: Increase buffer size to accomodate largest message length" };
+
+			if(m_state == GameState::GAME_OVER || m_state == GameState::GAME_OVER_DEFAULT_WIN)
+				return;
 		}
-		if (!numSocketsReady)
-			return false;
-
-		errno = 0;
-		if (!SDLNet_SocketReady(m_clientSocketTCP))
-			throw GameException{ std::string{"Client socket not ready, even though SDLNet_CheckSockets told us a socket was ready: "} +
-				SDLNet_GetError() + (errno ? " (errno = " + d2d::ToString(errno) + ")" : "") };
-
-		return true;
 	}
-	void Game::ReceiveNetworkData(Buffer& data)
+	bool Game::TCPReady() const
 	{
-		if (data.IsFull())
+		errno = 0;
+		SDLNet_SetError("");
+		int numSocketsReady = SDLNet_CheckSockets(m_socketSet, 0);
+		if(numSocketsReady == -1)
+			throw GameException{ std::string{"Failed to check sockets: "} +
+				SDLNet_GetError() + (errno ? " (errno = " + d2d::ToString(errno) + ")" : "") };
+		return (numSocketsReady > 0 && SDLNet_SocketReady(m_clientSocketTCP));
+	}
+	void Game::GetDataTCP()
+	{
+		if(m_inputBufferTCP.IsFull())
 			return;
 
 		// Try to receive data
-		int byteCount = SDLNet_TCP_Recv(m_clientSocketTCP, data.FirstAvailableBytePtr(), data.BytesAvailable());
+		SDLNet_SetError("");
+		int byteCount = SDLNet_TCP_Recv(m_clientSocketTCP, m_inputBufferTCP.FirstAvailableBytePtr(), m_inputBufferTCP.BytesAvailable());
 
 		// Check for error
-		if (byteCount < 0)
-			throw GameException{ std::string{"Failed to get network data: "} +SDLNet_GetError() };
+		if(byteCount < 0)
+			throw GameException{ std::string{"Failed to get TCP data: "} +SDLNet_GetError() };
 
 		// Check for disconnection
-		if (byteCount == 0)
+		if(byteCount == 0)
 			throw GameException{ "Connection unexpectedly terminated." };
 		else
 		{
 			// We received something
-			data.length += byteCount;
+			m_inputBufferTCP.length += byteCount;
 		}
 	}
-	void Game::ProcessMessages(Buffer& data)
+	bool Game::GetDataUDP()
+	{	
+		// Try to receive data
+		int packetCount = SDLNet_UDP_Recv(m_clientSocketUDP, m_inputUDPPacketPtr);
+
+		// Check for no packets
+		if(packetCount < 1)
+			return false;
+
+		// We received something. Copy packet to buffer
+		memcpy(m_inputBufferUDP.FirstBytePtr(), m_inputUDPPacketPtr->data, m_inputUDPPacketPtr->len);
+		m_inputBufferUDP.length = m_inputUDPPacketPtr->len;
+		d2LogInfo << "Received UDP packet with " << m_inputBufferUDP.length << " bytes";
+		return true;
+	}
+	void Game::ProcessMessagesTCP(Buffer& data)
 	{
 		int lastMessageStart{ 0 };
 		int nextMessageStart{ 0 };
 		do
 		{
 			lastMessageStart = nextMessageStart;
-			nextMessageStart = ProcessMessage(data, nextMessageStart);
-		} while (nextMessageStart != lastMessageStart);
+			nextMessageStart = ProcessMessageTCP(data, nextMessageStart);
+		} while(nextMessageStart != lastMessageStart);
 
 		// Discard processed data
 		data.MakeNewFront(nextMessageStart);
 	}
-	// Returns start of next message
-	int Game::ProcessMessage(const Buffer& data, int first)
+	void Game::ProcessMessagesUDP(Buffer& data)
 	{
-		if (first > data.length - 1)
+		d2LogInfo << "Processing UDP messages from buffer with " << data.length << " bytes.";
+		int lastMessageStart{ 0 };
+		int nextMessageStart{ 0 };
+		do
+		{
+			lastMessageStart = nextMessageStart;
+			d2LogInfo << "		messageStart " << nextMessageStart;
+			nextMessageStart = ProcessMessageUDP(data, nextMessageStart);
+		} while(nextMessageStart != lastMessageStart);
+
+		// Discard processed data
+		data.Clear();
+	}
+	// Returns start of next message
+	int Game::ProcessMessageTCP(const Buffer& data, int first)
+	{
+		if(first > data.length - 1)
 			return first;
 
-		switch (data.bytes[first])
+		switch(data.bytes[first])
 		{
-			// Player Ready
-		case MESSAGE_PLAYER_READY:
-			if (IsServer())
+		case TCP_MESSAGE_PLAYER_READY:
+			if(IsServer())
 				m_player2.SetReady();
 			else
 				m_player1.SetReady();
 			return first + 1;
 
-			// Player Scored
-		case MESSAGE_PLAYER_SCORED:
-			if (IsServer())
+		case TCP_MESSAGE_COUNTDOWN_OVER:
+			if(IsServer())
+				throw GameException{ "Client should not send PLAYER_SCORED message" };
+			else if(m_state == GameState::COUNTDOWN)
+				m_state = GameState::PLAY;
+			return first + 1;
+
+		case TCP_MESSAGE_PLAYER_SCORED:
+			if(IsServer())
 				throw GameException{ "Client should not send PLAYER_SCORED message" };
 			else
 			{
 				// If we only have partial message, do nothing
 				int availableDataBytes = data.length - first;
 				int messageBytes = 3;
-				if (availableDataBytes < messageBytes)
+				if(availableDataBytes < messageBytes)
 					return first;
 
 				// Read message
@@ -515,9 +601,9 @@ namespace Pong
 				Byte newScore2{ data.bytes[first + 2] };
 
 				// Verify validity and process new score
-				if (newScore1 == m_player1.GetScore() && newScore2 == m_player2.GetScore() + 1)
+				if(newScore1 == m_player1.GetScore() && newScore2 == m_player2.GetScore() + 1)
 					m_player2.ScorePoint();
-				else if (newScore1 == m_player1.GetScore() + 1 && newScore2 == m_player2.GetScore())
+				else if(newScore1 == m_player1.GetScore() + 1 && newScore2 == m_player2.GetScore())
 					m_player1.ScorePoint();
 				else
 					throw GameException{ std::string{"Invalid PLAYER_SCORED message: score1="} +
@@ -525,99 +611,152 @@ namespace Pong
 						" newScore1=" + d2d::ToString(newScore1) + " newScore2=" + d2d::ToString(newScore2) };
 
 				// See if someone won, otherwise start next round
-				if (m_player1.GetScore() >= SCORE_TO_WIN || m_player2.GetScore() >= SCORE_TO_WIN)
+				if(m_player1.GetScore() >= SCORE_TO_WIN || m_player2.GetScore() >= SCORE_TO_WIN)
 					m_state = GameState::GAME_OVER;
 				else
 					ResetRound();
 				return first + messageBytes;
 			}
 
-			// Countdown
-		case MESSAGE_COUNTDOWN_LEFT:
-			if (IsServer())
-				throw GameException{ "Client should not send COUNTDOWN_LEFT message" };
-			else
+		case TCP_MESSAGE_PLAYER_QUIT:
+			if(m_state == GameState::CONFIRM_PLAYERS_READY
+				|| m_state == GameState::COUNTDOWN
+				|| m_state == GameState::PLAY)
 			{
-				// If we only have partial message, do nothing
-				int availableDataBytes = data.length - first;
-				int messageBytes = 1 + sizeof(float);
-				if (availableDataBytes < messageBytes)
-					return first;
-
-				// Read message
-				m_countdownSecondsLeft = data.ReadFloat(first + 1);
-				return first + messageBytes;
+				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Game Over", "Remote player quit", nullptr);
+				m_state = GameState::GAME_OVER_DEFAULT_WIN;
 			}
+			return first + 1;
 
-			// Puck position/velocity
-		case MESSAGE_PUCK_POSITION_VELOCITY:
-			if (IsServer())
-				throw GameException{ "Client should not send PUCK_POSITION message" };
-			else
-			{
-				// If we only have partial message, do nothing
-				int availableDataBytes = data.length - first;
-				int messageBytes = 1 + 4 * sizeof(float);
-				if (availableDataBytes < messageBytes)
-					return first;
-
-				// Read position
-				b2Vec2 inputVector;
-				inputVector.x = data.ReadFloat(first + 1);
-				inputVector.y = data.ReadFloat(first + 1 + sizeof(float));
-				m_puck.SetPosition(inputVector);
-
-				// Read velocity
-				inputVector.x = data.ReadFloat(first + 1 + 2 * sizeof(float));
-				inputVector.y = data.ReadFloat(first + 1 + 3 * sizeof(float));
-				m_puck.SetVelocity(inputVector);
-
-				return first + messageBytes;
-			}
-
-			// Player position
-		case MESSAGE_PLAYER_POSITION:
-		{
-			// If we only have partial message, do nothing
-			int availableDataBytes = data.length - first;
-			int messageBytes = 1 + sizeof(float);
-			if (availableDataBytes < messageBytes)
-				return first;
-
-			// Read message
-			float newY{ data.ReadFloat(first + 1) };
-			if (IsServer())
-				m_player2.SetY(newY);
-			else
-				m_player1.SetY(newY);
-			return first + messageBytes;
-		}
 		default:
 			throw GameException{ std::string{"Invalid message code: "} +d2d::ToString(data.bytes[first]) };
 		}
 	}
+	// Returns start of next message
+	int Game::ProcessMessageUDP(const Buffer& data, int first)
+	{
+		if(first > data.length - 1)
+			return first;
+
+		d2LogInfo << "Processing a UDP message.";
+		switch(data.bytes[first])
+		{
+			case UDP_MESSAGE_COUNTDOWN_LEFT:
+				d2LogInfo << "Processing UDP_MESSAGE_COUNTDOWN_LEFT";
+				if(IsServer())
+					throw GameException{ "Client should not send COUNTDOWN_LEFT message" };
+				else
+				{
+					// If we only have partial message, do nothing
+					int availableDataBytes = data.length - first;
+					int messageBytes = 1 + sizeof(unsigned) + sizeof(float);
+					if(availableDataBytes < messageBytes)
+						return first;
+
+					// Check sequence number
+					unsigned sequenceNum = data.ReadUInt(first + 1);
+					if(sequenceNum >= m_lastUDPCountdownSequenceNum)
+					{
+						// Read message
+						m_countdownSecondsLeft = data.ReadFloat(first + 1 + sizeof(unsigned));
+
+						// Update sequence number
+						m_lastUDPCountdownSequenceNum = sequenceNum;
+					}
+					return first + messageBytes;
+				}
+			case UDP_MESSAGE_PUCK_POSITION_VELOCITY:
+				d2LogInfo << "Processing UDP_MESSAGE_PUCK_POSITION_VELOCITY";
+				if(IsServer())
+					throw GameException{ "Client should not send PUCK_POSITION message" };
+				else
+				{
+					// If we only have partial message, do nothing
+					int availableDataBytes = data.length - first;
+					int messageBytes = 1 + sizeof(unsigned) + 4 * sizeof(float);
+					if(availableDataBytes < messageBytes)
+						return first;
+
+					// Check sequence number
+					unsigned sequenceNum = data.ReadUInt(first + 1);
+					if(sequenceNum >= m_lastUDPPuckSequenceNum)
+					{
+						// Read position
+						b2Vec2 inputVector;
+						inputVector.x = data.ReadFloat(first + 1 + sizeof(unsigned));
+						inputVector.y = data.ReadFloat(first + 1 + sizeof(unsigned) + sizeof(float));
+						m_puck.SetPosition(inputVector);
+
+						// Read velocity
+						inputVector.x = data.ReadFloat(first + 1 + sizeof(unsigned) + 2 * sizeof(float));
+						inputVector.y = data.ReadFloat(first + 1 + sizeof(unsigned) + 3 * sizeof(float));
+						m_puck.SetVelocity(inputVector);
+
+						// Update sequence number
+						m_lastUDPPuckSequenceNum = sequenceNum;
+					}
+					return first + messageBytes;
+				}
+
+			case UDP_MESSAGE_PLAYER_Y:
+			{
+				d2LogInfo << "Processing UDP_MESSAGE_PLAYER_Y";
+
+				// If we only have partial message, do nothing
+				int availableDataBytes = data.length - first;
+				int messageBytes = 1 + sizeof(unsigned) + sizeof(float);
+				if(availableDataBytes < messageBytes)
+					return first;
+
+				// Check sequence number
+				d2LogInfo << "Checking UDP_MESSAGE_PLAYER_Y sequenceNum";
+				unsigned sequenceNum = data.ReadUInt(first + 1);
+				d2LogInfo << "		sequenceNum = " << sequenceNum << " m_lastUDPPlayerSequenceNum = " << m_lastUDPPlayerSequenceNum;
+				if(sequenceNum >= m_lastUDPPlayerSequenceNum)
+				{
+					d2LogInfo << "Reading UDP_MESSAGE_PLAYER_Y";
+					// Read message
+					float newY = data.ReadFloat(first + 1 + sizeof(unsigned));
+					d2LogInfo << "		newY = " << newY;
+					if(IsServer())
+						m_player2.SetY(newY);
+					else
+						m_player1.SetY(newY);
+
+					// Update sequence number
+					m_lastUDPPlayerSequenceNum = sequenceNum;
+				}
+				
+				return first + messageBytes;
+			}
+			default:
+				throw GameException{ std::string{"Invalid message code: "} +d2d::ToString(data.bytes[first]) };
+		}
+	}
+
 
 	void Game::UpdateWaitForClientConnection(float dt)
 	{
 		errno = 0;
+		SDLNet_SetError("");
 		int numSocketsReady = SDLNet_CheckSockets(m_socketSet, m_checkForClientConnectionTimeoutMilliseconds);
-		if (numSocketsReady == -1)
+		if(numSocketsReady == -1)
 		{
 			throw GameException{ std::string{"Failed to check sockets: "} +
 				SDLNet_GetError() + (errno ? " (errno = " + d2d::ToString(errno) + ")" : "") };
 		}
-		else if (numSocketsReady)
+		else if(numSocketsReady)
 		{
 			errno = 0;
-			if (!SDLNet_SocketReady(m_serverSocketTCP))
+			SDLNet_SetError("");
+			if(!SDLNet_SocketReady(m_serverSocketTCP))
 			{
 				throw GameException{ std::string{"Server socket not ready, even though SDLNet_CheckSockets told us a socket was ready: "} +
 					SDLNet_GetError() + (errno ? " (errno = " + d2d::ToString(errno) + ")" : "") };
 			}
 			else
 			{
-				m_clientSocketTCP = SDLNet_TCP_Accept(m_serverSocketTCP);
-				if (!m_clientSocketTCP)
+				if(!(m_clientSocketTCP = SDLNet_TCP_Accept(m_serverSocketTCP)))
 				{
 					SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Socket error",
 						"TCP Socket indicated that a client wanted to connect, but failed to accept connection. Continuing to wait for client.", nullptr);
@@ -625,24 +764,51 @@ namespace Pong
 				}
 
 				// Get the client's IP and port
-				IPaddress* clientIPPtr;
-				clientIPPtr = SDLNet_TCP_GetPeerAddress(m_clientSocketTCP);
-				if (!clientIPPtr)
+				IPaddress* clientIPPtr_TCP;
+				SDLNet_SetError("");
+				clientIPPtr_TCP = SDLNet_TCP_GetPeerAddress(m_clientSocketTCP);
+				if(!clientIPPtr_TCP)
 					throw GameException{ std::string{"SDLNet_TCP_GetPeerAddress: "} +SDLNet_GetError() };
 
 				// Print out the client's IP and port
+				std::string clientIPString{ d2d::GetIPOctetsString(*clientIPPtr_TCP) };
 				d2LogInfo << "Accepted a connection from "
-					<< d2d::GetIPOctetsString(*clientIPPtr) << " port " << d2d::GetPort(*clientIPPtr);
+					<< clientIPString << " port " << d2d::GetPort(*clientIPPtr_TCP);
+
 
 				// Replace server socket with client socket in socket set
-				if (SDLNet_TCP_DelSocket(m_socketSet, m_serverSocketTCP) == -1)
+				SDLNet_SetError("");
+				if(SDLNet_TCP_DelSocket(m_socketSet, m_serverSocketTCP) == -1)
 					throw GameException{ std::string{"After connecting to client, failed to delete server TCP socket from socket set: "} +SDLNet_GetError() };
-				if (SDLNet_TCP_AddSocket(m_socketSet, m_clientSocketTCP) == -1)
-					throw GameException{ std::string{"After connecting to client, failed to add client TCP socket to socket set: "} +SDLNet_GetError() };
-
-				// Close server socket
 				SDLNet_TCP_Close(m_serverSocketTCP);
 				m_serverSocketTCP = nullptr;
+
+				SDLNet_SetError("");
+				if(SDLNet_TCP_AddSocket(m_socketSet, m_clientSocketTCP) == -1)
+					throw GameException{ std::string{"After connecting to client, failed to add client TCP socket to socket set: "} +SDLNet_GetError() };
+
+				// Open local UDP port
+				SDLNet_SetError("");
+				if(!(m_clientSocketUDP = SDLNet_UDP_Open(m_networkSettings.serverPort)))
+					throw GameException{ std::string{"UDP: Failed to open port "} +
+						d2d::ToString(m_networkSettings.serverPort) + ": " + SDLNet_GetError() };
+
+				d2LogInfo << "Opened UDP port " << m_networkSettings.serverPort;
+
+				// Allocate in/out UDP packets
+				if(!(m_inputUDPPacketPtr = SDLNet_AllocPacket(BUFFER_SIZE)))
+					throw GameException{ "Failed to allocate input UDP packet: Out of memory" };
+				if(!(m_outputUDPPacketPtr = SDLNet_AllocPacket(BUFFER_SIZE)))
+					throw GameException{ "Failed to allocate output UDP packet: Out of memory" };
+
+				// Set address of outgoing UDP packets
+				SDLNet_SetError("");
+				if(SDLNet_ResolveHost(&m_outputUDPPacketPtr->address, clientIPString.c_str(), m_networkSettings.clientUDPPort) != 0)
+					throw GameException{ std::string{"Failed to resolve host "} + clientIPString +
+						" Port " + d2d::ToString(m_networkSettings.clientUDPPort) + ": " + SDLNet_GetError() };
+
+				d2LogInfo << "Address of outgoing packets set to "
+					<< d2d::GetIPOctetsString(m_outputUDPPacketPtr->address) << " port " << m_outputUDPPacketPtr->address.port;
 
 				// Connection made, start game
 				m_state = GameState::CONFIRM_PLAYERS_READY;
@@ -651,7 +817,7 @@ namespace Pong
 	}
 	void Game::UpdateConfirmPlayersReady(float dt)
 	{
-		if (m_player1.IsReady() && m_player2.IsReady())
+		if(m_player1.IsReady() && m_player2.IsReady())
 		{
 			m_countdownSecondsLeft = INITIAL_COUNTDOWN;
 			m_state = GameState::COUNTDOWN;
@@ -659,55 +825,61 @@ namespace Pong
 	}
 	void Game::UpdateCountdown(float dt)
 	{
-		if (!IsClient())
+		if(!IsClient())
 			m_countdownSecondsLeft -= dt;
 
-		if (m_countdownSecondsLeft <= 0.0f)
-			m_state = GameState::PLAY;
-
-		if (IsServer())
+		if(m_countdownSecondsLeft <= 0.0f)
 		{
-			m_networkOutputBuffer.WriteByte(MESSAGE_COUNTDOWN_LEFT);
-			m_networkOutputBuffer.WriteFloat(m_countdownSecondsLeft);
+			m_state = GameState::PLAY;
+			if(IsServer())
+				m_outputBufferTCP.WriteByte(TCP_MESSAGE_COUNTDOWN_OVER);
+		}
+		else if(IsServer())
+		{
+			m_outputBufferUDP.WriteByte(UDP_MESSAGE_COUNTDOWN_LEFT);
+			m_outputBufferUDP.WriteUInt(m_nextUDPSequenceNum++);
+			m_outputBufferUDP.WriteFloat(m_countdownSecondsLeft);
 		}
 	}
 	void Game::UpdatePlay(float dt)
 	{
-		if (!IsClient())
+		if(!IsClient())
 			m_player1.Update(dt);
-		if (!IsServer())
+		if(!IsServer())
 			m_player2.Update(dt);
 
-		//if (!IsClient())
-			m_puck.Update(dt, m_player1, m_player2);
+		m_puck.Update(dt, m_player1, m_player2);
 
-		if (IsClient())
+		if(IsClient())
 		{
-			m_networkOutputBuffer.WriteByte(MESSAGE_PLAYER_POSITION);
-			m_networkOutputBuffer.WriteFloat(m_player2.GetPosition().y);
+			m_outputBufferUDP.WriteByte(UDP_MESSAGE_PLAYER_Y);
+			m_outputBufferUDP.WriteUInt(m_nextUDPSequenceNum++);
+			m_outputBufferUDP.WriteFloat(m_player2.GetPosition().y);
 		}
-		else if (IsServer())
+		else if(IsServer())
 		{
-			m_networkOutputBuffer.WriteByte(MESSAGE_PUCK_POSITION_VELOCITY);
-			m_networkOutputBuffer.WriteFloat(m_puck.GetPosition().x);
-			m_networkOutputBuffer.WriteFloat(m_puck.GetPosition().y);
-			m_networkOutputBuffer.WriteFloat(m_puck.GetVelocity().x);
-			m_networkOutputBuffer.WriteFloat(m_puck.GetVelocity().y);
+			m_outputBufferUDP.WriteByte(UDP_MESSAGE_PUCK_POSITION_VELOCITY);
+			m_outputBufferUDP.WriteUInt(m_nextUDPSequenceNum++);
+			m_outputBufferUDP.WriteFloat(m_puck.GetPosition().x);
+			m_outputBufferUDP.WriteFloat(m_puck.GetPosition().y);
+			m_outputBufferUDP.WriteFloat(m_puck.GetVelocity().x);
+			m_outputBufferUDP.WriteFloat(m_puck.GetVelocity().y);
 
-			m_networkOutputBuffer.WriteByte(MESSAGE_PLAYER_POSITION);
-			m_networkOutputBuffer.WriteFloat(m_player1.GetPosition().y);
+			m_outputBufferUDP.WriteByte(UDP_MESSAGE_PLAYER_Y);
+			m_outputBufferUDP.WriteUInt(m_nextUDPSequenceNum++);
+			m_outputBufferUDP.WriteFloat(m_player1.GetPosition().y);
 		}
 
-		if (m_puck.Scored())
+		if(m_puck.Scored())
 		{
-			if (IsServer())
+			if(IsServer())
 			{
-				m_networkOutputBuffer.WriteByte(MESSAGE_PLAYER_SCORED);
-				m_networkOutputBuffer.WriteByte((Byte)m_player1.GetScore());
-				m_networkOutputBuffer.WriteByte((Byte)m_player2.GetScore());
+				m_outputBufferTCP.WriteByte(TCP_MESSAGE_PLAYER_SCORED);
+				m_outputBufferTCP.WriteByte((Byte)m_player1.GetScore());
+				m_outputBufferTCP.WriteByte((Byte)m_player2.GetScore());
 			}
 
-			if (m_player1.GetScore() >= SCORE_TO_WIN || m_player2.GetScore() >= SCORE_TO_WIN)
+			if(m_player1.GetScore() >= SCORE_TO_WIN || m_player2.GetScore() >= SCORE_TO_WIN)
 				m_state = GameState::GAME_OVER;
 			else
 				ResetRound();
@@ -750,7 +922,7 @@ namespace Pong
 	void Player::SetY(float newY)
 	{
 		if(newY < GAME_RECT.lowerBound.y || newY + PLAYER_SIZE.y > GAME_RECT.upperBound.y)
-			throw GameException{ std::string{"Player::SetY: Out of bounds: y="} + d2d::ToString(newY) };
+			throw GameException{ std::string{"Player::SetY: Out of bounds: y="} +d2d::ToString(newY) };
 		m_position.y = newY;
 	}
 	void Player::Update(float dt)
@@ -776,7 +948,7 @@ namespace Pong
 	}
 	void Player::ResetRound()
 	{
-		if (m_side == Side::LEFT)
+		if(m_side == Side::LEFT)
 			m_position.x = GAME_RECT.lowerBound.x;
 		else
 			m_position.x = GAME_RECT.upperBound.x - PLAYER_SIZE.x;
@@ -799,16 +971,20 @@ namespace Pong
 	{
 		m_position = GAME_RECT.GetCenter() - 0.5f * PUCK_SIZE;
 
-		if (IsClient())
+		if(IsClient())
 			m_velocity = b2Vec2_zero;
 		else
 		{
 			// Randomize puck angle
 			d2d::SeedRandomNumberGenerator();
-			float halfAngleRange = BOUNCE_ANGLE_RANGE * 0.5f;
+			/*float halfAngleRange = START_ANGLE_RANGE * 0.5f;
 			float angle = d2d::RandomFloat({ -halfAngleRange, halfAngleRange });
 			if (d2d::RandomBool())
+				angle += d2d::PI;*/
+			float angle = d2d::RandomBool() ? START_ANGLE : -START_ANGLE;
+			if(d2d::RandomBool())
 				angle += d2d::PI;
+			d2d::WrapRadians(angle);
 
 			m_velocity.Set(cos(angle), sin(angle));
 			m_velocity *= INITIAL_PUCK_SPEED;
@@ -824,9 +1000,9 @@ namespace Pong
 	void Puck::Update(float dt, Player& player1, Player& player2)
 	{
 		UpdatePosition(dt);
-		if (!IsClient())
+		if(!IsClient())
 		{
-			if (!m_gotPastPlayer)
+			if(!m_gotPastPlayer)
 			{
 				HandlePlayerCollision(player1);
 				HandlePlayerCollision(player2);
@@ -843,7 +1019,7 @@ namespace Pong
 		m_position += dt * m_velocity;
 
 		// Bounce ball off top wall
-		if (m_position.y >= MAX_Y)
+		if(m_position.y >= MAX_Y)
 		{
 			const float PROTRUSION_Y{ m_position.y - MAX_Y };
 			m_position.y = MAX_Y - PROTRUSION_Y;
@@ -851,7 +1027,7 @@ namespace Pong
 		}
 
 		// Bounce ball off bottom wall
-		if (m_position.y <= MIN_Y)
+		if(m_position.y <= MIN_Y)
 		{
 			const float PROTRUSION_Y{ MIN_Y - m_position.y };
 			m_position.y = MIN_Y + PROTRUSION_Y;
@@ -879,20 +1055,20 @@ namespace Pong
 		float overlapX;
 
 		// How much did the puck go past front of player along the x-axis?
-		if (player.GetSide() == Side::LEFT)
+		if(player.GetSide() == Side::LEFT)
 			overlapX = (player.GetPosition().x + PLAYER_SIZE.x) - m_position.x;
 		else
 			overlapX = (m_position.x + PUCK_SIZE.x) - player.GetPosition().x;
 
 		// If puck went past front of player along x-axis
-		if (overlapX >= 0.0f)
+		if(overlapX >= 0.0f)
 		{
 			// If the ball is traveling towards the player
-			if ((m_velocity.x < 0.0f && player.GetSide() == Side::LEFT) ||
+			if((m_velocity.x < 0.0f && player.GetSide() == Side::LEFT) ||
 				(m_velocity.x > 0.0f && player.GetSide() == Side::RIGHT))
 			{
 				// If there is separation along the Y-axis
-				if (m_position.y > player.GetPosition().y + PLAYER_SIZE.y ||
+				if(m_position.y > player.GetPosition().y + PLAYER_SIZE.y ||
 					m_position.y + PUCK_SIZE.y < player.GetPosition().y)
 				{
 					// The paddle missed
@@ -924,9 +1100,8 @@ namespace Pong
 						d2d::Clamp(puckPercentFromCenterToEdge, { -1.0f, 1.0f });
 
 						// Change angle based on how far off center it hit the player
-						float maxAngleChange = d2d::PI / 4.0f;
-						float angleChange = maxAngleChange * puckPercentFromCenterToEdge;
-						if (player.GetSide() == Side::LEFT)
+						float angleChange = MAX_CURVATURE_ANGLE_CHANGE * puckPercentFromCenterToEdge;
+						if(player.GetSide() == Side::LEFT)
 							angleOut += angleChange;
 						else
 							angleOut -= angleChange;
@@ -936,22 +1111,22 @@ namespace Pong
 					// Clamp angle to range
 					float angleLimitTop, angleLimitBottom;
 					float halfAngleRange = BOUNCE_ANGLE_RANGE / 2.0f;
-					if (player.GetSide() == Side::LEFT)
+					if(player.GetSide() == Side::LEFT)
 					{
 						angleLimitTop = halfAngleRange;
 						angleLimitBottom = d2d::TWO_PI - halfAngleRange;
-						if (angleOut > angleLimitTop&& angleOut < d2d::PI)
+						if(angleOut > angleLimitTop&& angleOut < d2d::PI)
 							angleOut = angleLimitTop;
-						else if (angleOut < angleLimitBottom && angleOut >= d2d::PI)
+						else if(angleOut < angleLimitBottom && angleOut >= d2d::PI)
 							angleOut = angleLimitBottom;
 					}
 					else
 					{
 						angleLimitTop = d2d::PI - halfAngleRange;
 						angleLimitBottom = d2d::PI + halfAngleRange;
-						if (angleOut < angleLimitTop)
+						if(angleOut < angleLimitTop)
 							angleOut = angleLimitTop;
-						else if (angleOut > angleLimitBottom)
+						else if(angleOut > angleLimitBottom)
 							angleOut = angleLimitBottom;
 					}
 
@@ -968,10 +1143,10 @@ namespace Pong
 	}
 	void Puck::HandleGoal(Player& player)
 	{
-		if (m_scored)
+		if(m_scored)
 			return;
 
-		if ((player.GetSide() == Side::LEFT && m_position.x + PUCK_SIZE.x >= GAME_RECT.upperBound.x) ||
+		if((player.GetSide() == Side::LEFT && m_position.x + PUCK_SIZE.x >= GAME_RECT.upperBound.x) ||
 			(player.GetSide() == Side::RIGHT && m_position.x <= GAME_RECT.lowerBound.x))
 		{
 			player.ScorePoint();

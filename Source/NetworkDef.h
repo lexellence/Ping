@@ -15,15 +15,8 @@ namespace Pong
 		void LoadFrom(const std::string& filePath);
 		void Validate() const;
 
-		struct
-		{
-			std::string remoteIP;
-			int remotePort;
-			int localPort;
-		} client;
-		struct
-		{
-			int localPort;
-		} server;
+		std::string serverIP;
+		int serverPort;
+		int clientUDPPort;
 	};
 }

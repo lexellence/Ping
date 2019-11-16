@@ -23,11 +23,14 @@ namespace Pong
 
 	const unsigned SCORE_TO_WIN{ 3u };
 	const float INITIAL_COUNTDOWN{ 3.0f };
-	const float INITIAL_PUCK_SPEED{ 0.4f * GAME_RECT.GetWidth() };
+	const float INITIAL_PUCK_SPEED{ 0.5f * GAME_RECT.GetWidth() };
 	//const float INITIAL_PUCK_ANGLE{ 0.748f * d2d::PI };
-	const float BOUNCE_ANGLE_RANGE{ 0.650f * d2d::PI };
+	const float START_ANGLE{ 0.2f * d2d::PI };
+	const float BOUNCE_ANGLE_RANGE{ 0.72f * d2d::PI };
+	const float MAX_CURVATURE_ANGLE_CHANGE = d2d::PI / 4.0f;
+
 	const float PUCK_SPEED_BOOST_MULTIPLIER{ 1.07f };
-	const float PLAYER_MAX_SPEED{ 0.8f * INITIAL_PUCK_SPEED };
+	const float PLAYER_MAX_SPEED{ 0.9f * INITIAL_PUCK_SPEED };
 
 	const d2d::Color BOUNDARY_COLOR{ 0.8f, 0.3f, 0.3f };
 	const d2d::Color NET_COLOR{ 0.8f, 0.3f, 0.3f };
@@ -37,20 +40,25 @@ namespace Pong
 	const float SLIGHTLY_LESS_THAN_ONE{ 0.99999f };
 
 	using Byte = Uint8;
-	const Byte MESSAGE_PLAYER_READY = 100;
-	const Byte MESSAGE_PLAYER_SCORED = 101;
-	const Byte MESSAGE_COUNTDOWN_LEFT = 102;
-	const Byte MESSAGE_PUCK_POSITION_VELOCITY = 103;
-	const Byte MESSAGE_PLAYER_POSITION = 104;
-	const Byte MESSAGE_PLAYER_QUIT = 105;
+	const Byte TCP_MESSAGE_PLAYER_READY = 100;
+	const Byte TCP_MESSAGE_PLAYER_SCORED = 101;
+	const Byte UDP_MESSAGE_COUNTDOWN_LEFT = 102;
+	const Byte TCP_MESSAGE_COUNTDOWN_OVER = 106;
+	const Byte UDP_MESSAGE_PUCK_POSITION_VELOCITY = 103;
+	const Byte UDP_MESSAGE_PLAYER_Y = 104;
+	const Byte TCP_MESSAGE_PLAYER_QUIT = 105;
 
-	const int BUFFER_SIZE{ 256 };
+	const int BUFFER_SIZE{ 100 };
 	using ByteBuffer = Byte[BUFFER_SIZE];
 	struct Buffer
 	{
 		ByteBuffer bytes;
 		int length{ 0 };
 
+		void Clear()
+		{
+			length = 0;
+		}
 		bool IsOverflowing() const
 		{
 			return length > BUFFER_SIZE;
@@ -77,6 +85,21 @@ namespace Pong
 				throw GameException{ "Buffer::WriteByte: Overflow: Increase buffer size" };
 			bytes[length] = value;
 			++length;
+		}
+		void WriteUInt(unsigned value)
+		{
+			static_assert(sizeof(Uint32) == sizeof(unsigned));
+			if(length + sizeof(unsigned) > BUFFER_SIZE)
+				throw GameException{ "Buffer::WriteUInt: Overflow: Increase buffer size" };
+			SDLNet_Write32(value, &bytes[length]);
+			length += sizeof(Uint32);
+		}
+		unsigned ReadUInt(int index) const
+		{
+			static_assert(sizeof(Uint32) == sizeof(unsigned));
+			if(index < 0 || index + (int)sizeof(unsigned) > length)
+				throw GameException{ "Buffer::ReadUInt: out of range" };
+			return SDLNet_Read32(&bytes[index]);
 		}
 		void WriteFloat(float value)
 		{
@@ -195,11 +218,17 @@ namespace Pong
 		void CloseNetwork();
 		void SendNetworkData();
 		void CheckMessages();
-		bool SocketReady() const;
-		void ReceiveNetworkData(Buffer& dataOut);
-		void ProcessMessages(Buffer& data);
+		bool TCPReady() const;
+		void GetDataTCP();
+		bool GetDataUDP();
+
+		void ProcessMessagesTCP(Buffer& data);
 		// Returns start of next message
-		int ProcessMessage(const Buffer& data, int first);
+		int ProcessMessageTCP(const Buffer& data, int first);
+
+		void ProcessMessagesUDP(Buffer& data);
+		// Returns start of next message
+		int ProcessMessageUDP(const Buffer& data, int first);
 
 		// Game
 		enum class GameState
@@ -208,22 +237,31 @@ namespace Pong
 			CONFIRM_PLAYERS_READY,
 			COUNTDOWN,
 			PLAY,
-			GAME_OVER
+			GAME_OVER,
+			GAME_OVER_DEFAULT_WIN
 		} m_state;
 		Player m_player1, m_player2;
 		Puck m_puck;
 		float m_countdownSecondsLeft;
 
 		// Network
-		GameInitSettings::Mode m_mode;
 		NetworkDef m_networkSettings;
 		TCPsocket m_serverSocketTCP{ nullptr };
 		TCPsocket m_clientSocketTCP{ nullptr };
+		UDPsocket m_clientSocketUDP{ nullptr };
 		SDLNet_SocketSet m_socketSet{ nullptr };
 		const Uint32 m_checkForClientConnectionTimeoutMilliseconds{ 15 };
-		Buffer m_networkInputBuffer;
-		Buffer m_networkOutputBuffer;
-
+		Buffer m_inputBufferTCP;
+		Buffer m_outputBufferTCP;
+		Buffer m_inputBufferUDP;
+		Buffer m_outputBufferUDP;
+		unsigned m_nextUDPSequenceNum{ 0 };
+		unsigned m_lastUDPCountdownSequenceNum{ 0 };
+		unsigned m_lastUDPPuckSequenceNum{ 0 };
+		unsigned m_lastUDPPlayerSequenceNum{ 0 };
+		UDPpacket* m_inputUDPPacketPtr{ nullptr };
+		UDPpacket* m_outputUDPPacketPtr{ nullptr };
+		
 		// Assets
 		d2d::FontReference m_orbitronLightFont{ "Fonts\\OrbitronLight.otf" };
 

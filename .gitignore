@@ -5,3 +5,4 @@ source/trash/
 *.iobj
 *.ipdb
 *.log
+*Log.txt
