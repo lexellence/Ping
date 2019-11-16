@@ -8,7 +8,6 @@
 **
 \**************************************************************************************/
 #pragma once
-union SDL_Event;
 namespace Pong
 {
 	enum class AppStateID
@@ -21,6 +20,7 @@ namespace Pong
 		virtual void Init() = 0;
 		virtual void ProcessEvent(const SDL_Event& event) = 0;
 		virtual AppStateID Update(float dt) = 0;
+		virtual d2d::Color GetClearColor() = 0;
 		virtual void Draw() = 0;
 	};
 }

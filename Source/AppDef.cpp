@@ -53,6 +53,7 @@ namespace Pong
 			window.size.at(1) = d2d::GetVectorInt(windowData, "size", 1);
 
 			window.vsync = d2d::GetBool(windowData, "vsync");
+			window.vsyncAllowLateSwaps = d2d::GetBool(windowData, "vsyncAllowLateSwaps");
 			window.doubleBuffer = d2d::GetBool(windowData, "doubleBuffer");
 			window.antiAliasingSamples = d2d::GetInt(windowData, "antiAliasingSamples");
 			window.fpsUpdateDelay = 1.0f / d2d::GetFloat(windowData, "fpsUpdatesPerSecond");
@@ -61,8 +62,6 @@ namespace Pong
 			window.colorChannelBits.at(1) = d2d::GetVectorInt(windowData, "colorChannelBits", 1);
 			window.colorChannelBits.at(2) = d2d::GetVectorInt(windowData, "colorChannelBits", 2);
 			window.colorChannelBits.at(3) = d2d::GetVectorInt(windowData, "colorChannelBits", 3);
-
-			//window.clearColor = d2d::GetColorFloat(windowData, "clearColor");
 
 			window.imageExtensions = 0;
 			for(unsigned i = 0; i < windowData["imageExtensions"].size(); ++i)
@@ -101,8 +100,8 @@ namespace Pong
 
 		// window
 		if(window.title.empty()) throw SettingOutOfRangeException{ "window.title" };
-		if(window.size[0] < 0) throw SettingOutOfRangeException{ "window.size[0]" };
-		if(window.size[1] < 0) throw SettingOutOfRangeException{ "window.size[1]" };
+		if(window.size.at(0) < 0) throw SettingOutOfRangeException{ "window.size[0]" };
+		if(window.size.at(1) < 0) throw SettingOutOfRangeException{ "window.size[1]" };
 		if(!d2d::Window::VALID_ANTI_ALIASING_SAMPLES.Contains(window.antiAliasingSamples))
 			throw SettingOutOfRangeException{ "window.antiAliasingSamples" };
 

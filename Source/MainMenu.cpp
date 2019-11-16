@@ -52,6 +52,10 @@ namespace Pong
 		}
 		return AppStateID::MAIN_MENU;
 	}
+	d2d::Color MainMenu::GetClearColor()
+	{
+		return d2d::BLACK_OPAQUE;
+	}
 	void MainMenu::Draw()
 	{
 		d2d::Window::SetShowCursor(true);

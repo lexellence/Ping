@@ -95,6 +95,10 @@ namespace Pong
 		}
 		return AppStateID::INTRO;
 	}
+	d2d::Color Intro::GetClearColor()
+	{
+		return d2d::BLACK_OPAQUE;
+	}
 	void Intro::Draw()
 	{
 		d2d::Window::SetShowCursor(false);

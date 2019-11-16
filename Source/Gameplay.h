@@ -29,6 +29,7 @@ namespace Pong
 		void Init() override;
 		void ProcessEvent(const SDL_Event& event) override;
 		AppStateID Update(float dt) override;
+		d2d::Color GetClearColor() override;
 		void Draw() override;
 
 	private:

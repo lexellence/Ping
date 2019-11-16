@@ -34,7 +34,7 @@ namespace Pong
 	void App::Init()
 	{
 		// Init d2d
-		d2d::Init(d2LogSeverityTrace, "PongLog.txt");
+		d2d::Init(d2LogSeverityTrace, "Pong.log");
 		{
 			AppDef settings;
 			settings.LoadFrom("Data\\app.hjson");
@@ -67,9 +67,11 @@ namespace Pong
 			{
 				m_currentState = m_nextState;
 				GetStatePtr(m_currentState)->Init();
+				d2d::Window::SetClearColor(GetStatePtr(m_currentState)->GetClearColor());
 			}
 			else
 			{
+
 				d2d::Window::StartScene();
 				GetStatePtr(m_currentState)->Draw();
 				d2d::Window::EndScene();

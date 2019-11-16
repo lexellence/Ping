@@ -174,6 +174,10 @@ namespace Pong
 		else
 			m_game.SetPlayer2MovementFactor(0.0f);
 	}
+	d2d::Color Gameplay::GetClearColor()
+	{
+		return d2d::BLACK_OPAQUE;
+	}
 	void Gameplay::Draw()
 	{
 		d2d::Window::SetShowCursor(false);
