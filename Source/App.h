@@ -28,9 +28,7 @@ namespace Pong
 		void Step(float dt);
 
 		std::shared_ptr<AppState> GetStatePtr(AppStateID appState);
-		//void InitCurrentState();
 		void UpdateCurrentState(float dt);
-		//void DrawCurrentState();
 		void Shutdown();
 
 		std::shared_ptr<Intro> m_introPtr;

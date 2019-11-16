@@ -27,9 +27,10 @@ namespace Pong
 	void Game::OnQuit()
 	{
 		// Send quit message
-		if(IsNetworked() && m_state == GameState::CONFIRM_PLAYERS_READY ||
+		if(IsNetworked() && 
+			(m_state == GameState::CONFIRM_PLAYERS_READY ||
 			m_state == GameState::COUNTDOWN || 
-			m_state == GameState::PLAY)
+			m_state == GameState::PLAY))
 		{
 			m_outputBufferTCP.WriteByte(TCP_MESSAGE_PLAYER_QUIT);
 			SendNetworkData();
@@ -81,7 +82,7 @@ namespace Pong
 		// Server: open port to allow clients to connect
 		if(IsServer())
 		{
-			d2LogInfo << "Attempting to open port " << m_networkSettings.serverPort;
+			d2LogInfo << "Attempting to open TCP port " << m_networkSettings.serverPort;
 
 			// Get proper host format
 			IPaddress myIP;
@@ -97,13 +98,13 @@ namespace Pong
 				throw GameException{ std::string{"Failed to add server TCP socket to socket set: "} +SDLNet_GetError() };
 
 			// Print success confirmation
-			d2LogInfo << "Opened port " << d2d::GetPort(myIP) << ". Waiting for client connection...";
+			d2LogInfo << "Opened TCP port " << d2d::GetPort(myIP) << ". Waiting for client connection...";
 		}
 
 		// Client: connect to server
 		else
 		{
-			d2LogInfo << "Attempting to connect to " << m_networkSettings.serverIP << " port " << m_networkSettings.serverPort;
+			d2LogInfo << "Attempting to connect to " << m_networkSettings.serverIP << " TCP port " << m_networkSettings.serverPort;
 
 			// Get proper host format
 			IPaddress serverIP;
@@ -119,7 +120,7 @@ namespace Pong
 
 			// Print out the server's IP and port
 			d2LogInfo << d2d::GetIPOctetsString(serverIP) << " port " << d2d::GetPort(serverIP)
-				<< " accepted a connection";
+				<< " accepted a TCP connection";
 
 			// Add client socket to set so we don't have to block to send/receive
 			SDLNet_SetError("");
@@ -143,7 +144,7 @@ namespace Pong
 			// Set address of outgoing UDP packets
 			m_outputUDPPacketPtr->address = serverIP;
 
-			d2LogInfo << "Address of outgoing packets set to "
+			d2LogInfo << "Address of outgoing UDP packets set to "
 				<< d2d::GetIPOctetsString(serverIP) << " port " << d2d::GetPort(serverIP);
 		}
 
@@ -421,9 +422,9 @@ namespace Pong
 
 		// Process network input/output
 		if(IsNetworked() &&
-			m_state == GameState::CONFIRM_PLAYERS_READY ||
+			(m_state == GameState::CONFIRM_PLAYERS_READY ||
 			m_state == GameState::COUNTDOWN ||
-			m_state == GameState::PLAY)
+			m_state == GameState::PLAY))
 		{
 			CheckMessages();
 			SendNetworkData();
@@ -453,7 +454,6 @@ namespace Pong
 
 				// Send packet
 				SDLNet_SetError("");
-				d2LogInfo << "Sending UDP packet with " << m_outputUDPPacketPtr->len << " bytes";
 				int packetsSent = SDLNet_UDP_Send(m_clientSocketUDP, -1, m_outputUDPPacketPtr);
 				if(packetsSent < 1)
 					throw GameException{ std::string{"Failed to send UDP packet of "} +d2d::ToString(m_outputBufferUDP.length) +
@@ -532,7 +532,6 @@ namespace Pong
 		// We received something. Copy packet to buffer
 		memcpy(m_inputBufferUDP.FirstBytePtr(), m_inputUDPPacketPtr->data, m_inputUDPPacketPtr->len);
 		m_inputBufferUDP.length = m_inputUDPPacketPtr->len;
-		d2LogInfo << "Received UDP packet with " << m_inputBufferUDP.length << " bytes";
 		return true;
 	}
 	void Game::ProcessMessagesTCP(Buffer& data)
@@ -550,13 +549,11 @@ namespace Pong
 	}
 	void Game::ProcessMessagesUDP(Buffer& data)
 	{
-		d2LogInfo << "Processing UDP messages from buffer with " << data.length << " bytes.";
 		int lastMessageStart{ 0 };
 		int nextMessageStart{ 0 };
 		do
 		{
 			lastMessageStart = nextMessageStart;
-			d2LogInfo << "		messageStart " << nextMessageStart;
 			nextMessageStart = ProcessMessageUDP(data, nextMessageStart);
 		} while(nextMessageStart != lastMessageStart);
 
@@ -619,9 +616,9 @@ namespace Pong
 			}
 
 		case TCP_MESSAGE_PLAYER_QUIT:
-			if(m_state == GameState::CONFIRM_PLAYERS_READY
-				|| m_state == GameState::COUNTDOWN
-				|| m_state == GameState::PLAY)
+			if(m_state == GameState::CONFIRM_PLAYERS_READY ||
+				m_state == GameState::COUNTDOWN ||
+				m_state == GameState::PLAY)
 			{
 				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Game Over", "Remote player quit", nullptr);
 				m_state = GameState::GAME_OVER_DEFAULT_WIN;
@@ -638,11 +635,9 @@ namespace Pong
 		if(first > data.length - 1)
 			return first;
 
-		d2LogInfo << "Processing a UDP message.";
 		switch(data.bytes[first])
 		{
 			case UDP_MESSAGE_COUNTDOWN_LEFT:
-				d2LogInfo << "Processing UDP_MESSAGE_COUNTDOWN_LEFT";
 				if(IsServer())
 					throw GameException{ "Client should not send COUNTDOWN_LEFT message" };
 				else
@@ -666,7 +661,6 @@ namespace Pong
 					return first + messageBytes;
 				}
 			case UDP_MESSAGE_PUCK_POSITION_VELOCITY:
-				d2LogInfo << "Processing UDP_MESSAGE_PUCK_POSITION_VELOCITY";
 				if(IsServer())
 					throw GameException{ "Client should not send PUCK_POSITION message" };
 				else
@@ -700,8 +694,6 @@ namespace Pong
 
 			case UDP_MESSAGE_PLAYER_Y:
 			{
-				d2LogInfo << "Processing UDP_MESSAGE_PLAYER_Y";
-
 				// If we only have partial message, do nothing
 				int availableDataBytes = data.length - first;
 				int messageBytes = 1 + sizeof(unsigned) + sizeof(float);
@@ -709,15 +701,11 @@ namespace Pong
 					return first;
 
 				// Check sequence number
-				d2LogInfo << "Checking UDP_MESSAGE_PLAYER_Y sequenceNum";
 				unsigned sequenceNum = data.ReadUInt(first + 1);
-				d2LogInfo << "		sequenceNum = " << sequenceNum << " m_lastUDPPlayerSequenceNum = " << m_lastUDPPlayerSequenceNum;
 				if(sequenceNum >= m_lastUDPPlayerSequenceNum)
 				{
-					d2LogInfo << "Reading UDP_MESSAGE_PLAYER_Y";
 					// Read message
 					float newY = data.ReadFloat(first + 1 + sizeof(unsigned));
-					d2LogInfo << "		newY = " << newY;
 					if(IsServer())
 						m_player2.SetY(newY);
 					else
@@ -756,6 +744,8 @@ namespace Pong
 			}
 			else
 			{
+				d2LogInfo << "Attempting to accept TCP connection from client...";
+
 				if(!(m_clientSocketTCP = SDLNet_TCP_Accept(m_serverSocketTCP)))
 				{
 					SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Socket error",
@@ -772,7 +762,7 @@ namespace Pong
 
 				// Print out the client's IP and port
 				std::string clientIPString{ d2d::GetIPOctetsString(*clientIPPtr_TCP) };
-				d2LogInfo << "Accepted a connection from "
+				d2LogInfo << "Accepted a TCP connection from "
 					<< clientIPString << " port " << d2d::GetPort(*clientIPPtr_TCP);
 
 
@@ -807,7 +797,7 @@ namespace Pong
 					throw GameException{ std::string{"Failed to resolve host "} + clientIPString +
 						" Port " + d2d::ToString(m_networkSettings.clientUDPPort) + ": " + SDLNet_GetError() };
 
-				d2LogInfo << "Address of outgoing packets set to "
+				d2LogInfo << "Address of outgoing UDP packets set to "
 					<< d2d::GetIPOctetsString(m_outputUDPPacketPtr->address) << " port " << m_outputUDPPacketPtr->address.port;
 
 				// Connection made, start game
