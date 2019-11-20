@@ -25,13 +25,13 @@ namespace Pong
 		d2d::FontReference m_alexBrushFont{ "Fonts\\AlexBrush.otf"s };
 		d2d::FontReference m_orbitronLightFont{ "Fonts\\OrbitronLight.otf"s };
 
-		const std::string m_titleText{ "Super Ping Pong Simulator"s };
+		const std::string m_titleText{ "Ping"s };
 		const d2d::Alignment m_titleAlignment{ d2d::Alignment::CENTER_BOTTOM };
-		const d2d::TextStyle m_titleStyle{ m_orbitronLightFont, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.045f };
+		const d2d::TextStyle m_titleStyle{ m_orbitronLightFont, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.065f };
 
 		const std::string m_authorText{ "Lexellence Games"s };
 		const d2d::Alignment m_authorAlignment{ d2d::Alignment::CENTER_TOP };
-		d2d::TextStyle m_authorStyle{ m_alexBrushFont, { 0.7f, 0.0f, 0.7f, 1.0f }, 0.045f };
+		d2d::TextStyle m_authorStyle{ m_alexBrushFont, { 0.7f, 0.0f, 0.7f, 1.0f }, 0.055f };
 
 		const float m_titleAccelerationScreensPerSecondSquared{ 0.15f };
 		const float m_titleStartScreenY{ 1.0f };

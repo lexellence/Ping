@@ -32,8 +32,8 @@ namespace Pong
 		const std::vector<std::string> m_buttonNames{ m_startTwoPlayerLocalText, m_startServerText, m_startClientText, m_quitText };
 		d2d::TextStyle m_buttonTextStyle{ m_orbitronLightFont, { 0.0f, 0.5f, 0.8f, 1.0f }, 0.035f };
 
-		const std::string m_titleText{ "Super Ping Pong Simulator" };
-		const d2d::TextStyle m_titleStyle{ m_orbitronLightFont, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.045f };
+		const std::string m_titleText{ "Ping" };
+		const d2d::TextStyle m_titleStyle{ m_orbitronLightFont, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.055f };
 
 		const d2d::Color m_buttonColor{ d2d::COLOR_ZERO };
 		const d2d::Color m_buttonHighlightColor{ 1.0f, 1.0f, 1.0f, 0.3f };

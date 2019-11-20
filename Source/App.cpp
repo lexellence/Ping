@@ -34,7 +34,7 @@ namespace Pong
 	void App::Init()
 	{
 		// Init d2d
-		d2d::Init(d2LogSeverityTrace, "Pong.log");
+		d2d::Init(d2LogSeverityTrace, "Ping.log");
 		{
 			AppDef settings;
 			settings.LoadFrom("Data\\app.hjson");
