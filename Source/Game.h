@@ -24,7 +24,6 @@ namespace Pong
 	const unsigned SCORE_TO_WIN{ 3u };
 	const float INITIAL_COUNTDOWN{ 3.0f };
 	const float INITIAL_PUCK_SPEED{ 0.5f * GAME_RECT.GetWidth() };
-	//const float INITIAL_PUCK_ANGLE{ 0.748f * d2d::PI };
 	const float START_ANGLE{ 0.2f * d2d::PI };
 	const float BOUNCE_ANGLE_RANGE{ 0.72f * d2d::PI };
 	const float MAX_CURVATURE_ANGLE_CHANGE = d2d::PI / 4.0f;
@@ -39,14 +38,19 @@ namespace Pong
 
 	const float SLIGHTLY_LESS_THAN_ONE{ 0.99999f };
 
+	const Uint32 TCP_SERVER_CHECK_FOR_CLIENT_CONNECTION_TIMEOUT_MILLISECONDS{ 15 };
+	const float MAX_TIME_TO_WAIT_FOR_CLIENT_UDP{ 10.0f };
+
 	using Byte = Uint8;
-	const Byte TCP_MESSAGE_PLAYER_READY = 100;
-	const Byte TCP_MESSAGE_PLAYER_SCORED = 101;
-	const Byte UDP_MESSAGE_COUNTDOWN_LEFT = 102;
-	const Byte TCP_MESSAGE_COUNTDOWN_OVER = 106;
-	const Byte UDP_MESSAGE_PUCK_POSITION_VELOCITY = 103;
-	const Byte UDP_MESSAGE_PLAYER_Y = 104;
-	const Byte TCP_MESSAGE_PLAYER_QUIT = 105;
+	const Byte UDP_MESSAGE_INIT_CLIENT_TO_SERVER = 100;
+	const Byte TCP_MESSAGE_CLIENT_INIT_UDP_TIMEOUT = 101;
+	const Byte TCP_MESSAGE_PLAYER_READY = 102;
+	const Byte TCP_MESSAGE_PLAYER_SCORED = 103;
+	const Byte UDP_MESSAGE_COUNTDOWN_LEFT = 104;
+	const Byte TCP_MESSAGE_COUNTDOWN_OVER = 105;
+	const Byte UDP_MESSAGE_PUCK_POSITION_VELOCITY = 106;
+	const Byte UDP_MESSAGE_PLAYER_Y = 107;
+	const Byte TCP_MESSAGE_PLAYER_QUIT = 108;
 
 	const int BUFFER_SIZE{ 100 };
 	using ByteBuffer = Byte[BUFFER_SIZE];
@@ -204,7 +208,9 @@ namespace Pong
 	private:
 		void ResetRound();
 
-		void UpdateWaitForClientConnection(float dt);
+		void UpdateUDPInit(float dt);
+
+		void UpdateWaitForClientTCPConnection(float dt);
 		void UpdateConfirmPlayersReady(float dt);
 		void UpdateCountdown(float dt);
 		void UpdatePlay(float dt);
@@ -233,7 +239,7 @@ namespace Pong
 		// Game
 		enum class GameState
 		{
-			WAIT_FOR_CLIENT_CONNECTION,
+			WAIT_FOR_CLIENT_TCP_CONNECTION,
 			CONFIRM_PLAYERS_READY,
 			COUNTDOWN,
 			PLAY,
@@ -246,22 +252,28 @@ namespace Pong
 
 		// Network
 		NetworkDef m_networkSettings;
-		TCPsocket m_serverSocketTCP{ nullptr };
 		TCPsocket m_clientSocketTCP{ nullptr };
 		UDPsocket m_clientSocketUDP{ nullptr };
 		SDLNet_SocketSet m_socketSet{ nullptr };
-		const Uint32 m_checkForClientConnectionTimeoutMilliseconds{ 15 };
 		Buffer m_inputBufferTCP;
 		Buffer m_outputBufferTCP;
 		Buffer m_inputBufferUDP;
 		Buffer m_outputBufferUDP;
 		unsigned m_nextUDPSequenceNum{ 0 };
-		unsigned m_lastUDPCountdownSequenceNum{ 0 };
-		unsigned m_lastUDPPuckSequenceNum{ 0 };
 		unsigned m_lastUDPPlayerSequenceNum{ 0 };
 		UDPpacket* m_inputUDPPacketPtr{ nullptr };
 		UDPpacket* m_outputUDPPacketPtr{ nullptr };
-		
+		bool m_serverWaitingForClientUDP{ false };
+		bool m_serverTimedOutWaitingForClientUDP{ false };
+
+		// For server use only
+		TCPsocket m_serverSocketTCP{ nullptr };
+		float m_timeWaitingForClientUDP{ 0.0f };
+
+		// For client use only
+		unsigned m_lastUDPCountdownSequenceNum{ 0 };
+		unsigned m_lastUDPPuckSequenceNum{ 0 };
+
 		// Assets
 		d2d::FontReference m_orbitronLightFont{ "Fonts\\OrbitronLight.otf" };
 

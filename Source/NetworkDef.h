@@ -17,6 +17,6 @@ namespace Pong
 
 		std::string serverIP;
 		int serverPort;
-		int clientUDPPort;
+		//int clientUDPPort;
 	};
 }

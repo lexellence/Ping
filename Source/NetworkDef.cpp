@@ -22,7 +22,7 @@ namespace Pong
 		try	{
 			serverIP = d2d::GetString(data, "serverIP");
 			serverPort = d2d::GetInt(data, "serverPort");
-			clientUDPPort = d2d::GetInt(data, "clientUDPPort");
+			//clientUDPPort = d2d::GetInt(data, "clientUDPPort");
 		}
 		catch(const d2d::HjsonFailedQueryException& e) {
 			throw LoadSettingsFileException{ gameFilePath + ": Invalid value: " + e.what() };
@@ -39,6 +39,6 @@ namespace Pong
 	{
 		if(serverIP.empty()) throw SettingOutOfRangeException{ "serverIP" };
 		if(serverPort <= 0) throw SettingOutOfRangeException{ "serverPort" };
-		if(clientUDPPort <= 0) throw SettingOutOfRangeException{ "clientPortUDP" };
+		//if(clientUDPPort <= 0) throw SettingOutOfRangeException{ "clientPortUDP" };
 	}
 }
