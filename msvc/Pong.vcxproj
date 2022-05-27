@@ -94,17 +94,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\Source\App.h" />
-    <ClInclude Include="..\Source\AppDef.h" />
-    <ClInclude Include="..\Source\AppState.h" />
-    <ClInclude Include="..\Source\Exceptions.h" />
-    <ClInclude Include="..\Source\Game.h" />
-    <ClInclude Include="..\Source\GameInitSettings.h" />
-    <ClInclude Include="..\Source\Gameplay.h" />
-    <ClInclude Include="..\Source\Intro.h" />
-    <ClInclude Include="..\Source\MainMenu.h" />
-    <ClInclude Include="..\Source\NetworkDef.h" />
-    <ClInclude Include="..\Source\pch.h" />
+    <ClCompile Include="..\repo\Source\App.cpp" />
+    <ClCompile Include="..\repo\Source\AppDef.cpp" />
+    <ClCompile Include="..\repo\Source\Game.cpp" />
+    <ClCompile Include="..\repo\Source\GameInitSettings.cpp" />
+    <ClCompile Include="..\repo\Source\Gameplay.cpp" />
+    <ClCompile Include="..\repo\Source\Intro.cpp" />
+    <ClCompile Include="..\repo\Source\main.cpp" />
+    <ClCompile Include="..\repo\Source\MainMenu.cpp" />
+    <ClCompile Include="..\repo\Source\NetworkDef.cpp" />
+    <ClCompile Include="..\repo\Source\pch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\repo\Source\App.h" />
