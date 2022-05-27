@@ -1141,7 +1141,7 @@ namespace Pong
 
 					// Convert ball's velocity to polar coordinates
 					float angleOut = atan2(m_velocity.y, m_velocity.x);
-					float speed = sqrt(pow(m_velocity.x, 2) + pow(m_velocity.y, 2));
+					float speed = sqrtf(powf(m_velocity.x, 2) + powf(m_velocity.y, 2));
 
 					// Simulate curved paddle
 					{
