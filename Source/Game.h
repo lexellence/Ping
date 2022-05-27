@@ -23,13 +23,14 @@ namespace Pong
 
 	const unsigned SCORE_TO_WIN{ 3u };
 	const float INITIAL_COUNTDOWN{ 3.0f };
-	const float INITIAL_PUCK_SPEED{ 0.5f * GAME_RECT.GetWidth() };
+	const float INITIAL_PUCK_SPEED{ 0.35f * GAME_RECT.GetWidth() };
 	const float START_ANGLE{ 0.2f * d2d::PI };
 	const float BOUNCE_ANGLE_RANGE{ 0.72f * d2d::PI };
 	const float MAX_CURVATURE_ANGLE_CHANGE = d2d::PI / 4.0f;
 
 	const float PUCK_SPEED_BOOST_MULTIPLIER{ 1.07f };
-	const float PLAYER_MAX_SPEED{ 0.9f * INITIAL_PUCK_SPEED };
+	//const float PLAYER_MAX_SPEED{ 0.9f * INITIAL_PUCK_SPEED };
+	const float PLAYER_MAX_SPEED{ 250.0f };
 
 	const d2d::Color BOUNDARY_COLOR{ 0.8f, 0.3f, 0.3f };
 	const d2d::Color NET_COLOR{ 0.8f, 0.3f, 0.3f };
