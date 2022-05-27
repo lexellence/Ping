@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{17cf8598-4238-46c3-891a-c0aead00225a}</ProjectGuid>
+    <RootNamespace>Pong</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>C:\Development\Libraries\box2d-2.4.1\include;C:\boost\boost_1_79_0;C:\Development\Libraries\hjson;C:\Development\Libraries\libdrawtext\include;C:\Development\Libraries\SDL2_net-2.0.1\include;C:\Development\Libraries\SDL2_image-2.0.5\include;C:\Development\Projects\d2d\repo\Include;C:\Development\Libraries\SDL2-2.0.22\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Development\Libraries\box2d-2.4.1\lib\x64\Debug;C:\Development\Libraries\SDL2-2.0.22\lib\x64;$(LibraryPath)</LibraryPath>
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)\Intermediate\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>C:\Development\Libraries\box2d-2.4.1\include;C:\boost\boost_1_79_0;C:\Development\Libraries\hjson;C:\Development\Libraries\libdrawtext\include;C:\Development\Libraries\SDL2_net-2.0.1\include;C:\Development\Libraries\SDL2_image-2.0.5\include;C:\Development\Projects\d2d\repo\Include;C:\Development\Libraries\SDL2-2.0.22\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Development\Libraries\box2d-2.4.1\lib\x64\Release;C:\Development\Libraries\SDL2-2.0.22\lib\x64;$(LibraryPath)</LibraryPath>
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)\Intermediate\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Development\Libraries\freetype\freetype-2.12.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;freetype.lib;SDL2_image.lib;SDL2_net.lib;opengl32.lib;glu32.lib;d2d.lib;hjson.lib;libdrawtext.lib;box2d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Development\Libraries\freetype\freetype-2.12.1\lib\x64\Debug Static;C:\Development\Libraries\SDL2_image-2.0.5\lib\x64;C:\Development\Libraries\SDL2_net-2.0.1\lib\x64;C:\Development\Libraries\libdrawtext\lib\x64\Debug;C:\Development\Libraries\hjson\lib\x64\Debug;C:\Development\Projects\d2d\repo\Lib\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Development\Libraries\freetype\freetype-2.12.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;freetype.lib;SDL2_image.lib;SDL2_net.lib;opengl32.lib;glu32.lib;d2d.lib;hjson.lib;libdrawtext.lib;box2d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Development\Libraries\freetype\freetype-2.12.1\lib\x64\Release Static;C:\Development\Libraries\SDL2_image-2.0.5\lib\x64;C:\Development\Libraries\SDL2_net-2.0.1\lib\x64;C:\Development\Libraries\libdrawtext\lib\x64\Release;C:\Development\Libraries\hjson\lib\x64\Release;C:\Development\Projects\d2d\repo\Lib\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\repo\Source\App.cpp" />
+    <ClCompile Include="..\repo\Source\AppDef.cpp" />
+    <ClCompile Include="..\repo\Source\Game.cpp" />
+    <ClCompile Include="..\repo\Source\GameInitSettings.cpp" />
+    <ClCompile Include="..\repo\Source\Gameplay.cpp" />
+    <ClCompile Include="..\repo\Source\Intro.cpp" />
+    <ClCompile Include="..\repo\Source\main.cpp" />
+    <ClCompile Include="..\repo\Source\MainMenu.cpp" />
+    <ClCompile Include="..\repo\Source\NetworkDef.cpp" />
+    <ClCompile Include="..\repo\Source\pch.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\repo\Source\App.h" />
+    <ClInclude Include="..\repo\Source\AppDef.h" />
+    <ClInclude Include="..\repo\Source\AppState.h" />
+    <ClInclude Include="..\repo\Source\Exceptions.h" />
+    <ClInclude Include="..\repo\Source\Game.h" />
+    <ClInclude Include="..\repo\Source\GameInitSettings.h" />
+    <ClInclude Include="..\repo\Source\Gameplay.h" />
+    <ClInclude Include="..\repo\Source\Intro.h" />
+    <ClInclude Include="..\repo\Source\MainMenu.h" />
+    <ClInclude Include="..\repo\Source\NetworkDef.h" />
+    <ClInclude Include="..\repo\Source\pch.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
