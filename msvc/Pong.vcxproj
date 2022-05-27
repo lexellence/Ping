@@ -107,16 +107,17 @@
     <ClInclude Include="..\Source\pch.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Source\App.cpp" />
-    <ClCompile Include="..\Source\AppDef.cpp" />
-    <ClCompile Include="..\Source\Game.cpp" />
-    <ClCompile Include="..\Source\GameInitSettings.cpp" />
-    <ClCompile Include="..\Source\Gameplay.cpp" />
-    <ClCompile Include="..\Source\Intro.cpp" />
-    <ClCompile Include="..\Source\main.cpp" />
-    <ClCompile Include="..\Source\MainMenu.cpp" />
-    <ClCompile Include="..\Source\NetworkDef.cpp" />
-    <ClCompile Include="..\Source\pch.cpp" />
+    <ClInclude Include="..\repo\Source\App.h" />
+    <ClInclude Include="..\repo\Source\AppDef.h" />
+    <ClInclude Include="..\repo\Source\AppState.h" />
+    <ClInclude Include="..\repo\Source\Exceptions.h" />
+    <ClInclude Include="..\repo\Source\Game.h" />
+    <ClInclude Include="..\repo\Source\GameInitSettings.h" />
+    <ClInclude Include="..\repo\Source\Gameplay.h" />
+    <ClInclude Include="..\repo\Source\Intro.h" />
+    <ClInclude Include="..\repo\Source\MainMenu.h" />
+    <ClInclude Include="..\repo\Source\NetworkDef.h" />
+    <ClInclude Include="..\repo\Source\pch.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
